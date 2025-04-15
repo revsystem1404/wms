@@ -1,0 +1,123 @@
+{% extends "layout.html" %} <!-- Extends layout.html -->
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center">
+        <h1>Employee Time Tracker</h1>
+        {% if 'time_tracker_logged_in' in session %}
+        <a href="{{ url_for('time_tracker_logout') }}" class="btn btn-danger">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+        {% endif %}
+    </div>
+
+    <hr>
+
+    <h3>Employees</h3>
+
+    <div id="refresh-spinner" class="text-center my-3" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+    
+    <div id="employee-table">
+        {% include 'partials/employee_table.html' %}
+    </div>    
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function bindClockButtons() {
+    document.querySelectorAll(".clock-btn").forEach(btn => {
+        btn.addEventListener("click", function () {
+            const employeeId = this.getAttribute("data-id");
+            const action = this.getAttribute("data-action");
+            const row = document.querySelector(`#employee-row-${employeeId}`);
+
+            fetch(`/${action}/${employeeId}`, {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) return;
+
+                const clockInSpan = document.getElementById(`clock-in-${employeeId}`);
+                if (data.clock_in && clockInSpan) {
+                    clockInSpan.innerHTML = `<i class="fas fa-clock"></i> ${data.clock_in}`;
+                    clockInSpan.className = "badge bg-success py-2 px-3 fs-5 shadow-sm";
+                }
+
+                const clockOutSpan = document.getElementById(`clock-out-${employeeId}`);
+                if (clockOutSpan) {
+                    if (data.clock_out) {
+                        clockOutSpan.innerHTML = `<i class="fas fa-clock"></i> ${data.clock_out}`;
+                        clockOutSpan.className = "badge bg-danger py-2 px-3 fs-5 shadow-sm";
+                    } else {
+                        clockOutSpan.innerHTML = `<i class="fas fa-hourglass-half"></i> Still Working`;
+                        clockOutSpan.className = "badge bg-warning text-dark py-2 px-3 fs-5 shadow-sm";
+                    }
+                }
+
+                const totalSpan = document.getElementById(`total-hours-${employeeId}`);
+                if (totalSpan && data.total_hours) {
+                    totalSpan.innerHTML = `<i class="fas fa-hourglass-half me-1"></i> Total Hours: ${data.total_hours}`;
+                }
+
+                const button = row.querySelector(".clock-btn");
+                if (action === "clock_in") {
+                    button.innerHTML = `<i class="fas fa-sign-out-alt"></i> Clock Out`;
+                    button.classList.remove("btn-success");
+                    button.classList.add("btn-danger");
+                    button.setAttribute("data-action", "clock_out");
+                } else {
+                    button.innerHTML = `<i class="fas fa-sign-in-alt"></i> Clock In`;
+                    button.classList.remove("btn-danger");
+                    button.classList.add("btn-success");
+                    button.setAttribute("data-action", "clock_in");
+                }
+
+                row.scrollIntoView({ behavior: "smooth", block: "center" });
+
+                // 🔁 Refresh table after successful action to sync state
+                refreshEmployeeTable();
+            })
+            .catch(err => {
+                console.error("AJAX error:", err);
+            });
+        });
+    });
+}
+
+function refreshEmployeeTable() {
+    const spinner = document.getElementById('refresh-spinner');
+    const container = document.getElementById('employee-table');
+
+    if (spinner) spinner.style.display = 'block';
+
+    fetch('/employee_table')
+        .then(res => res.text())
+        .then(html => {
+            if (container.innerHTML.trim() !== html.trim()) {
+                container.innerHTML = html;
+                bindClockButtons(); // Rebind only if changed
+            }
+        })
+        .catch(err => console.error("Table refresh error:", err))
+        .finally(() => {
+            if (spinner) spinner.style.display = 'none';
+        });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    bindClockButtons();
+    refreshEmployeeTable();
+    window.addEventListener("focus", refreshEmployeeTable);
+});
+</script>
+{% endblock %}

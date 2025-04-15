@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container mt-5">
+
+    <!-- 🧼 Header with Logout Button | Mobile-ready -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h1 class="mb-0">Prep Worklog</h1>
+        <a href="{{ url_for('department_logout') }}" class="btn btn-danger btn-sm">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+    
+    {% if assigned_tasks %}
+    <div class="mb-4">
+        <h4>📋 Assigned Tasks</h4>
+        <ul class="list-group">
+            {% for task in assigned_tasks %}
+            <li class="list-group-item">
+                <strong>{{ task.title }}</strong><br>
+                <small class="text-muted">{{ task.created_at.strftime('%d %b %Y %H:%M') }}</small><br>
+                {{ task.description }}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <p>This is the Prep worklog page. You can add content here later.</p>
+
+    <!-- 📱 Future table wrapper -->
+    <!--
+    <div class="table-responsive">
+        <table class="table">
+            ...
+        </table>
+    </div>
+    -->
+
+</div>
+{% endblock %}

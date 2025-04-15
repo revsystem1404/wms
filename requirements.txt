@@ -1,0 +1,14 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+Werkzeug==2.3.7
+SQLAlchemy==2.0.23
+fpdf==1.7.2
+pandas==2.1.0
+APScheduler==3.10.4
+gunicorn==21.2.0
+psycopg2-binary==2.9.9
+openpyxl==3.1.2
+Pillow==10.0.0
+python-dotenv==1.0.0
+reportlab==4.0.7

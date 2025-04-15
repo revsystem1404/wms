@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container mt-5">
+  <h2>✏️ Edit Assigned Task</h2>
+
+  <form method="POST">
+    <div class="mb-3">
+      <label class="form-label">Department</label>
+      <select class="form-select" name="department" required>
+        {% for dept in departments %}
+        <option value="{{ dept }}" {% if task.department==dept %}selected{% endif %}>
+          {{ dept.replace('-', ' ').title() }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Job Title</label>
+      <input type="text" class="form-control" name="title" id="jobTitleInput" value="{{ task.title }}" required>
+    </div>
+
+    <!-- Delivery/Collection Section -->
+    <div id="deliveryCollectionFields" class="mb-3" style="display: none;">
+      <div class="card border-primary">
+        <div class="card-header bg-primary text-white">
+          <strong>Delivery/Collection Details</strong>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">Vehicle Registration</label>
+            <input type="text" name="vehicle_reg" class="form-control" id="vehicleRegField"
+              value="{{ task.vehicle_reg or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Customer/Contact Name</label>
+            <input type="text" name="contact_name" class="form-control" id="contactNameField"
+              value="{{ task.contact_name or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Contact Number</label>
+            <input type="tel" name="contact_number" class="form-control" id="contactNumberField"
+              value="{{ task.contact_number or '' }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Address</label>
+            <textarea name="contact_address" class="form-control" rows="3"
+              id="contactAddressField">{{ task.contact_address or '' }}</textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Additional Notes</label>
+            <textarea name="contact_notes" class="form-control" rows="2"
+              id="contactNotesField">{{ task.contact_notes or '' }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-control" rows="4" required>{{ task.description }}</textarea>
+    </div>
+
+    <button type="submit" class="btn btn-success">Update Task</button>
+    <a href="{{ url_for('manage_assigned_tasks') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+
+<script>
+  function checkDeliveryCollectionFields() {
+    const selectedJob = document.getElementById("jobTitleInput").value;
+    const deliveryCollectionFields = document.getElementById("deliveryCollectionFields");
+
+    const fields = [
+      document.getElementById("vehicleRegField"),
+      document.getElementById("contactNameField"),
+      document.getElementById("contactNumberField"),
+      document.getElementById("contactAddressField")
+    ];
+
+    if (selectedJob === "Collection" || selectedJob === "Delivery") {
+      deliveryCollectionFields.style.display = "block";
+      fields.forEach(field => field.required = true);
+    } else {
+      deliveryCollectionFields.style.display = "none";
+      fields.forEach(field => field.required = false);
+    }
+  }
+
+  document.getElementById("jobTitleInput").addEventListener("input", checkDeliveryCollectionFields);
+  document.getElementById("jobTitleInput").addEventListener("change", checkDeliveryCollectionFields);
+
+  document.addEventListener("DOMContentLoaded", checkDeliveryCollectionFields);
+</script>
+{% endblock %}

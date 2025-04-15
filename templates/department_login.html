@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-5">
+
+  <!-- 🌟 Department Login Heading -->
+  <div class="text-center mb-4">
+    <h2 class="fw-bold text-dark">{{ selected_department|title if selected_department else "Department" }} Login</h2>
+    <p class="lead text-muted">
+      {% if selected_department == "mot" %}
+        Manage and log MOT-related workflows, inspections, and tracking directly from this portal.
+      {% elif selected_department == "prep" %}
+        Install cameras, reverse sensors, and change dial cards on speedometers — all tracked with real-time logging.
+      {% elif selected_department == "service" %}
+        Access job cards, mark services complete, and report technician progress with timestamps.
+      {% elif selected_department == "body-shop" %}
+        Handle repairs, paintwork, and all body shop assignments securely and efficiently.
+      {% elif selected_department == "reg-advert" %}
+        Track registration, advertising assets, and compliance entries across vehicles.
+      {% elif selected_department == "sold" %}
+        Log sold vehicle prep, final inspections, and post-sale delivery readiness.
+      {% else %}
+        Log in to manage work tasks and logs specific to your department.
+      {% endif %}
+    </p>
+  </div>
+
+  <!-- 🔐 Flash Message -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} text-center rounded-pill shadow-sm">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- 🔑 Login Form -->
+  <form method="POST" class="bg-white shadow rounded-4 p-4 mx-auto" style="max-width: 500px;">
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Username</label>
+      <input type="text" name="username" class="form-control rounded-pill" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Password</label>
+      <div class="input-group">
+        <input type="password" name="password" id="password" class="form-control rounded-start-pill" required>
+        <button class="btn btn-outline-secondary rounded-end-pill" type="button" onclick="togglePassword()">
+          <i class="fas fa-eye"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="d-grid">
+      <button type="submit" class="btn btn-primary rounded-pill fw-semibold">
+        <i class="fas fa-sign-in-alt me-1"></i> Login
+      </button>
+    </div>
+  </form>
+
+</div>
+
+<!-- 🔁 Toggle Password Script -->
+<script>
+  function togglePassword() {
+    const input = document.getElementById('password');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+</script>
+{% endblock %}

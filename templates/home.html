@@ -1,0 +1,98 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-5">
+
+  <!-- 🌟 Hero Section -->
+  <section class="bg-dark text-white rounded-4 p-5 text-center shadow mb-5">
+    <h1 class="display-4 fw-bold mb-3">Workforce Managing System (WMS)</h1>
+    <p class="fs-5 text-light opacity-75">Your smart hub for managing employee performance and vehicle operations in real-time.</p>
+  </section>
+
+  <!-- ⚠️ Alert -->
+  <div class="alert alert-danger rounded-pill text-center shadow-sm fs-5 mb-5">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>REMINDER:</strong> All vehicle key activity must be logged — untracked losses will be your responsibility.
+  </div>
+
+  <!-- 🛠 Management Tools -->
+  <div class="row g-4 justify-content-center mb-4">
+
+    <!-- Admin Dashboard -->
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow border-0 rounded-4 h-100">
+        <div class="card-body text-center p-4">
+          <div class="mb-4">
+            <i class="fas fa-chart-line fa-3x text-warning"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Admin Dashboard</h3>
+          <p class="text-muted mb-3">
+            View a real-time summary of all employee logs, work sessions, pay calculations, and overtime stats. The admin dashboard gives you full visibility into your workforce and lets you manage everything from a single place.
+          </p>
+          <a href="/admin_dashboard" class="btn btn-warning rounded-pill px-4 py-2 text-white">Go to Dashboard</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assign Work -->
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow border-0 rounded-4 h-100">
+        <div class="card-body text-center p-4">
+          <div class="mb-4">
+            <i class="fas fa-tasks fa-3x" style="color: #6366f1;"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Assign Work</h3>
+          <p class="text-muted mb-3">
+            Assign tasks to individual employees by department (MOT, Prep, Service, etc.). Monitor status updates, clear logs, and track who's handling what to streamline your workflow and boost accountability.
+          </p>
+          <a href="/assign_work" class="btn rounded-pill px-4 py-2 text-white" style="background-color:#6366f1;">Go to Assign Work</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ⏱ Tools -->
+  <div class="row g-4 justify-content-center">
+
+    <!-- Time Tracker -->
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow border-0 rounded-4 h-100">
+        <div class="card-body text-center p-4">
+          <div class="mb-4">
+            <i class="fas fa-user-clock fa-3x text-primary"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Employee Time Tracker</h3>
+          <p class="text-muted mb-3">
+            Track when staff clock in and out with detailed timestamps and summaries. Automatically calculates total hours worked, regular pay, and overtime. Manual adjustments are also available for accurate reporting.
+          </p>
+          <a href="/employee_time_tracker" class="btn btn-primary rounded-pill px-4 py-2">Go to Time Tracker</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vehicle Key Monitor -->
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow border-0 rounded-4 h-100">
+        <div class="card-body text-center p-4">
+          <div class="mb-4">
+            <i class="fas fa-key fa-3x text-success"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Vehicle Key Monitor</h3>
+          <p class="text-muted mb-3">
+            Keep track of which staff checked out which keys — and when they returned them. This tool ensures full accountability for vehicle access, reducing risk and helping resolve disputes quickly.
+          </p>
+          <a href="/vehicle_key_monitor" class="btn btn-success rounded-pill px-4 py-2">Go to Key Monitor</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ℹ️ Footer Note -->
+  <div class="alert alert-info text-center mt-5 fs-5 rounded-pill shadow-sm">
+    Select a tool above to begin managing your operations with confidence and clarity.
+  </div>
+
+</div>
+{% endblock %}

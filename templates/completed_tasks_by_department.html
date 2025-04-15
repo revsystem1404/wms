@@ -1,0 +1,306 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2>
+    ✅ Completed Tasks – {{ department.replace('-', ' ').title() }}
+  </h2>
+
+  {% if technician %}
+  <div class="alert alert-success mt-2">
+    👤 You are now viewing <strong>{{ technician }}</strong>'s full logs.
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2 my-4">
+    <a href="{{ url_for('select_completed_department') }}" class="btn btn-outline-secondary">
+      🔙 Back to Choose Department
+    </a>
+    <a href="{{ url_for('assign_work') }}" class="btn btn-outline-primary">
+      🛠 Back to Assign Work
+    </a>
+  </div>
+
+  {% if department == 'mot' %}
+  {% if view_manual %}
+  <a href="{{ url_for('view_completed_tasks_by_department', department='mot', technician=technician) }}"
+    class="btn btn-outline-secondary mb-4">
+    🙈 Hide Manual MOT Logs
+  </a>
+  {% else %}
+  <a href="{{ url_for('view_completed_tasks_by_department', department='mot', technician=technician, view_manual='true') }}"
+    class="btn btn-outline-info mb-4">
+    🔍 View Manual MOT Logs
+  </a>
+  {% endif %}
+  {% endif %}
+
+  <!-- Technician Filter Dropdown -->
+  <form method="GET" class="row g-3 mt-3 mb-4">
+    <input type="hidden" name="department" value="{{ department }}">
+    <div class="col-md-4">
+      <label class="form-label">Select Technician</label>
+      <select name="technician" id="technicianFilter" class="form-select">
+        <option value="" selected>-- Select Technician --</option>
+        {% for technician in department_technicians %}
+        <option value="{{ technician.username }}" {% if technician.username==technician %}selected{% endif %}>
+          {{ technician.username }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-4 d-flex align-items-end gap-2">
+      <button type="submit" class="btn btn-primary w-100">Filter</button>
+      <!-- 🟥 Modal Trigger Button -->
+      <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#confirmResetModal">
+        Reset
+      </button>
+    </div>
+  </form>
+
+  {% if technician %}
+
+  {% if completed_tasks %}
+  <div class="accordion mt-4" id="assignedTasksAccordion">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="assignedTasksHeading">
+        <button class="accordion-button collapsed d-flex justify-content-between align-items-center" type="button"
+          data-bs-toggle="collapse" data-bs-target="#assignedTasksCollapse" aria-expanded="false" aria-controls="assignedTasksCollapse">
+          <span>📋 Assigned Tasks (click to view)</span>
+          <i class="fas fa-plus ms-2 toggle-icon"></i>
+        </button>
+      </h2>
+      <div id="assignedTasksCollapse" class="accordion-collapse collapse" aria-labelledby="assignedTasksHeading"
+        data-bs-parent="#assignedTasksAccordion">
+        <div class="accordion-body p-0">
+          <div class="accordion" id="completedTasksAccordion">
+            {% for task in completed_tasks %}
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="completed-heading-{{ task.id }}">
+                <button class="accordion-button collapsed d-flex justify-content-between align-items-center w-100" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#completed-collapse-{{ task.id }}" aria-expanded="false"
+                  aria-controls="completed-collapse-{{ task.id }}">
+                  <div>
+                    <strong>{{ task.title }}</strong>
+                    {% if task.contact_name %}
+                    <span class="ms-2">for {{ task.contact_name }}</span>
+                    {% endif %}
+                    <span class="text-muted ms-2">{{ task.created_at.strftime('%A, %d %B %Y %H:%M') }}</span>
+                  </div>
+                  <i class="fas fa-plus toggle-icon ms-2"></i>
+                </button>
+              </h2>
+              <div id="completed-collapse-{{ task.id }}" class="accordion-collapse collapse"
+                aria-labelledby="completed-heading-{{ task.id }}" data-bs-parent="#completedTasksAccordion">
+                <div class="accordion-body">
+                  <p>{{ task.description }}</p>
+
+                  {% if task.vehicle_reg %}<p><strong>Vehicle Reg:</strong> {{ task.vehicle_reg }}</p>{% endif %}
+                  {% if task.contact_name %}<p><strong>Contact Name:</strong> {{ task.contact_name }}</p>{% endif %}
+                  {% if task.contact_number %}<p><strong>Contact Number:</strong> {{ task.contact_number }}</p>{% endif %}
+                  {% if task.contact_address %}<p><strong>Contact Address:</strong> {{ task.contact_address }}</p>{% endif %}
+                  {% if task.contact_notes %}<p><strong>Contact Notes:</strong> {{ task.contact_notes }}</p>{% endif %}
+                  {% if task.assigned_to %}<p><strong>Completed by:</strong> {{ task.assigned_to }}</p>{% endif %}
+                  {% if task.start_time %}<p><strong>Begin Time:</strong> {{ task.start_time.strftime('%A, %d %B %Y %H:%M:%S') }}</p>{% endif %}
+                  {% if task.complete_time %}<p><strong>Complete Time:</strong> {{ task.complete_time.strftime('%A, %d %B %Y %H:%M:%S') }}</p>{% endif %}
+
+                  {% if task.images %}
+                  <div class="mt-3 d-flex flex-wrap gap-3">
+                    {% for image in task.images %}
+                    <a href="{{ url_for('static', filename='uploads/' ~ image.filename) }}" class="glightbox"
+                      data-gallery="completed-task-gallery-{{ task.id }}"
+                      data-title="Task: {{ task.title }} - Image {{ loop.index }}">
+                      <img src="{{ url_for('static', filename='uploads/' ~ image.filename) }}" alt="Task Image"
+                        class="img-thumbnail" style="max-width: 200px;">
+                    </a>
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% if not loop.last %}
+            <hr class="my-4" style="border-top: 4px solid #ccc;">
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-secondary mt-4">
+    No completed tasks for {{ technician }}.
+  </div>
+  {% endif %}
+
+  {% if department == 'mot' and view_manual %}
+  <div class="accordion mt-5" id="weekLogsAccordion">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="manualLogsHeader">
+        <button class="accordion-button collapsed d-flex justify-content-between align-items-center" type="button"
+          data-bs-toggle="collapse" data-bs-target="#manualLogsCollapse" aria-expanded="false" aria-controls="manualLogsCollapse">
+          <span>📘 Manual MOT Logs (click to view)</span>
+          <i class="fas fa-plus ms-2 toggle-icon"></i>
+        </button>
+      </h2>
+      <div id="manualLogsCollapse" class="accordion-collapse collapse" aria-labelledby="manualLogsHeader"
+        data-bs-parent="#weekLogsAccordion">
+        <div class="accordion-body">
+          {% if manual_logs %}
+            {% set grouped_logs = {} %}
+            {% for log in manual_logs %}
+              {% set week_key = log.start_time.strftime('%Y-W%U') %}
+              {% if week_key not in grouped_logs %}
+                {% set _ = grouped_logs.update({week_key: []}) %}
+              {% endif %}
+              {% set _ = grouped_logs[week_key].append(log) %}
+            {% endfor %}
+
+            <div class="accordion" id="manualLogItemsAccordion">
+              {% for week, logs in grouped_logs.items() %}
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="heading-{{ week }}">
+                  <button class="accordion-button collapsed d-flex justify-content-between align-items-center" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#collapse-{{ week }}" aria-expanded="false" aria-controls="collapse-{{ week }}">
+                    {% set day = logs[0].start_time.day %}
+                    {% if day <= 7 %}{% set week_of_month = 1 %}
+                    {% elif day <= 14 %}{% set week_of_month = 2 %}
+                    {% elif day <= 21 %}{% set week_of_month = 3 %}
+                    {% else %}{% set week_of_month = 4 %}
+                    {% endif %}
+                    📅 Week {{ week_of_month }} ({{ logs[0].start_time.strftime('%B %Y') }})
+                    <i class="fas fa-plus ms-2 toggle-icon"></i>
+                  </button>
+                </h2>
+                <div id="collapse-{{ week }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ week }}"
+                  data-bs-parent="#manualLogItemsAccordion">
+                  <div class="accordion-body">
+                    {% set current_date = None %}
+                    {% for log in logs|sort(attribute='start_time') %}
+                      {% set log_date = log.start_time.strftime('%A, %d %B %Y') %}
+                      {% if log_date != current_date %}
+                        {% if not loop.first %}
+                              </tbody>
+                            </table>
+                        {% endif %}
+                        <h5 class="mt-4 mb-2 text-primary">{{ log_date }}</h5>
+                        <table class="table table-bordered align-middle">
+                          <thead class="table-light">
+                            <tr>
+                              <th>Vehicle Reg</th>
+                              <th>Task</th>
+                              <th>Start</th>
+                              <th>End</th>
+                              <th>Status</th>
+                              <th>Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                        {% set current_date = log_date %}
+                      {% endif %}
+                      <tr>
+                        <td>{{ log.vehicle_reg }}</td>
+                        <td>{{ log.task }}</td>
+                        <td>{{ log.start_time.strftime('%H:%M') }}</td>
+                        <td>{{ log.end_time.strftime('%H:%M') if log.end_time else '-' }}</td>
+                        <td>
+                          <span class="badge {{ 'bg-success' if log.status == 'completed' else 'bg-warning text-dark' }}">
+                            {{ log.status|capitalize }}
+                          </span>
+                        </td>
+                        <td>{{ log.notes or '-' }}</td>
+                      </tr>
+                    {% endfor %}
+                    </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-muted">No manual MOT logs found for {{ technician }}.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+{% else %}
+<div class="alert alert-info mt-4">
+  Please select a technician to view completed and manual logs.
+</div>
+{% endif %}
+
+  <!-- 🔔 Bootstrap Modal for Reset Confirmation -->
+  <div class="modal fade" id="confirmResetModal" tabindex="-1" aria-labelledby="confirmResetLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="POST" action="{{ url_for('reset_completed_tasks') }}">
+          <div class="modal-header">
+            <h5 class="modal-title" id="confirmResetLabel">Confirm Reset</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Are you sure you want to <strong>permanently delete</strong> all completed tasks for the
+            <strong>{{ department.replace('-', ' ').title() }}</strong> department?
+          </div>
+          <div class="modal-footer">
+            <input type="hidden" name="department" value="{{ department }}">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-danger">Yes, Reset</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- GLightbox CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
+
+  <!-- GLightbox JS -->
+  <script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      GLightbox({
+        selector: '.glightbox',
+        touchNavigation: true,
+        loop: true,
+        zoomable: true
+      });
+
+      // Toggle icon based on accordion state (Completed Tasks)
+      document.querySelectorAll('#completedTasksAccordion .accordion-button').forEach(button => {
+        button.addEventListener('click', function () {
+          const icon = this.querySelector('.toggle-icon');
+          const isCollapsed = this.classList.contains('collapsed');
+          icon.classList.toggle('fa-plus', isCollapsed);
+          icon.classList.toggle('fa-minus', !isCollapsed);
+        });
+      });
+
+      // Expand/Collapse all (if you add buttons for this later)
+      window.expandAllTasks = function () {
+        const items = document.querySelectorAll('#completedTasksAccordion .accordion-collapse');
+        items.forEach(item => bootstrap.Collapse.getOrCreateInstance(item).show());
+      };
+
+      window.collapseAllTasks = function () {
+        const items = document.querySelectorAll('#completedTasksAccordion .accordion-collapse');
+        items.forEach(item => bootstrap.Collapse.getOrCreateInstance(item).hide());
+      };
+    });
+  </script>
+
+  <!-- Hide Bootstrap's default arrow so only the custom toggle icon is visible -->
+  <style>
+    .accordion-button::after {
+      display: none !important;
+    }
+  </style>
+
+  {% endblock %}

@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container mt-5">
+  <h2>🔧 Manage Active Assigned Tasks</h2>
+  <p>View, edit, or delete tasks currently assigned to departments.</p>
+
+  {% if tasks %}
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Department</th>
+          <th>Title</th>
+          <th>Vehicle Reg</th> <!-- ✅ New column -->
+          <th>Technician</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in tasks %}
+        <tr>
+          <td>{{ task.department.title() }}</td>
+          <td>{{ task.title }}</td>
+          <td>{{ task.vehicle_reg or "-" }}</td> <!-- ✅ New field shown -->
+          <td>{{ task.assigned_to or "Unassigned" }}</td>
+          <td>
+            {% if task.status == 'pending' %}
+              <span class="badge bg-warning text-dark">Pending</span>
+            {% elif task.status == 'in_progress' %}
+              <span class="badge bg-info text-dark">In Progress</span>
+            {% endif %}
+          </td>
+          <td>{{ task.created_at.strftime('%d %b %Y %H:%M') }}</td>
+          <td>
+            <a href="{{ url_for('edit_assigned_task', task_id=task.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <form action="{{ url_for('delete_assigned_task', task_id=task.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this task?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="alert alert-info">No active tasks found.</div>
+  {% endif %}
+
+  <div class="mt-4">
+    <a href="{{ url_for('assign_work') }}" class="btn btn-secondary">← Back to Assign Work</a>
+  </div>
+</div>
+{% endblock %}

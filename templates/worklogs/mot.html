@@ -1,0 +1,505 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container mt-5">
+
+    <!-- 📱 Mobile-friendly header bar -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h1 class="mb-0">MOT Worklog</h1>
+        <a href="{{ url_for('department_logout') }}" class="btn btn-danger btn-sm">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+
+    <!-- 🚗 Start Work Form -->
+    <form method="POST" action="/worklogs/mot/start" class="mb-4">
+        <input type="hidden" name="technician" value="{{ technician }}">
+
+        <div class="mb-3">
+            <label class="form-label">Vehicle Registration</label>
+            <input type="text" name="vehicle_reg" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Task Performed</label>
+            <select name="task" class="form-select" required>
+                <option value="" disabled selected>Select a task</option>
+                <option value="MOT">MOT</option>
+                <option value="Garage repair">Garage repair</option>
+                <option value="IVA">IVA</option>
+                <option value="Delivery">Delivery</option>
+                <option value="Collection">Collection</option>
+                <option value="Location Change">Location Change</option>
+                <option value="Workshop Runs">Workshop Runs</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Start Work</button>
+    </form>
+
+    <!-- 👨‍🔧 Technician Info -->
+    <div class="mb-3">
+        <p><strong>🚗 Technician:</strong> {{ technician }}</p>
+        <p><strong>📝 Logs submitted today:</strong> {{ log_count }}</p>
+        <p><strong>🧾 Logs completed this month:</strong> {{ log_count_this_month }}</p>
+        <p><strong>📌 Tasks assigned today:</strong> {{ assigned_today_count }}</p>
+        <p><strong>✅ Tasks completed this month:</strong> {{ completed_task_count }}</p>
+    </div>
+
+    {% if assigned_tasks %}
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 class="mb-0">📋 Assigned Tasks</h4>
+        </div>
+        <div class="accordion" id="assignedTasksAccordion">
+            {% for task in assigned_tasks %}
+            {% if (task.status == 'pending' and (not task.assigned_to or task.assigned_to == technician)) or
+            (task.status == 'in_progress' and task.assigned_to == technician) %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading-{{ task.id }}">
+                    <button class="accordion-button collapsed d-flex justify-content-between align-items-center w-100"
+                        type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ task.id }}"
+                        aria-expanded="false" aria-controls="collapse-{{ task.id }}">
+                        <div>
+                            <strong>{{ task.title }}</strong>
+                            {% if task.contact_name %}
+                            <span class="ms-2">for {{ task.contact_name }}</span>
+                            {% endif %}
+                            <span class="text-muted ms-2">{{ task.created_at.strftime('%d %b %Y %H:%M') }}</span>
+                        </div>
+                        <i class="ms-3 toggle-icon fas fa-plus"></i>
+                    </button>
+                </h2>
+                <div id="collapse-{{ task.id }}" class="accordion-collapse collapse"
+                    aria-labelledby="heading-{{ task.id }}" data-bs-parent="#assignedTasksAccordion">
+                    <div class="accordion-body">
+                        <p>{{ task.description }}</p>
+
+                        {% if task.title in ['Delivery', 'Collection'] and task.contact_name %}
+                        <div class="mt-2 p-2 border-start border-4 border-info bg-light">
+                            <h6 class="text-primary">{{ task.title }} Details:</h6>
+                            <p class="mb-1"><strong>Vehicle Reg:</strong> {{ task.vehicle_reg }}</p>
+                            <p class="mb-1"><strong>Name:</strong> {{ task.contact_name }}</p>
+                            <p class="mb-1"><strong>Contact:</strong> {{ task.contact_number }}</p>
+                            <p class="mb-1"><strong>Address:</strong> {{ task.contact_address }}</p>
+                            {% if task.contact_notes %}
+                            <p class="mb-0"><strong>Notes:</strong> {{ task.contact_notes }}</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        {% if task.images %}
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            {% for image in task.images %}
+                            <a href="{{ url_for('static', filename='uploads/' ~ image.filename) }}" class="glightbox"
+                                data-gallery="assigned-task-gallery-{{ task.id }}"
+                                data-title="Task: {{ task.title }} - Image {{ loop.index }}">
+                                <img src="{{ url_for('static', filename='uploads/' ~ image.filename) }}"
+                                    alt="Task Image" class="img-thumbnail" style="max-width: 150px;">
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if task.assigned_to %}
+                        <div><small class="text-info">In Progress by {{ task.assigned_to }}</small></div>
+                        {% endif %}
+
+                        <div class="mt-2">
+                            {% if task.status == 'pending' %}
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal"
+                                data-bs-target="#confirmStartModal" data-task-id="{{ task.id }}">
+                                Begin
+                            </button>
+                            {% elif task.status == 'in_progress' and task.assigned_to == technician %}
+                            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal"
+                                data-bs-target="#confirmCompleteModal" data-task-id="{{ task.id }}">
+                                Complete
+                            </button>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 🔄 In-Progress Tasks (Responsive) -->
+    {% if in_progress_logs %}
+    <h4 class="mt-4 mb-3">🕒 In-Progress Tasks</h4>
+
+    <!-- 🖥 Desktop Table View -->
+    <div class="table-responsive d-none d-md-block">
+        <table class="table table-hover table-bordered align-middle bg-light">
+            <thead class="table-warning text-dark small text-uppercase">
+                <tr>
+                    <th>Vehicle Reg</th>
+                    <th>Task</th>
+                    <th>Started At</th>
+                    <th>Add Notes</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in in_progress_logs %}
+                <form method="POST" action="/worklogs/mot/complete/{{ log.id }}">
+                    <tr>
+                        <td>{{ log.vehicle_reg }}</td>
+                        <td>{{ log.task }}</td>
+                        <td>{{ log.start_time.strftime('%A %d/%m/%Y %H:%M') }}</td>
+                        <td>
+                            <textarea name="notes" class="form-control form-control-sm auto-grow" rows="1"
+                                oninput="autoGrow(this)" style="resize: none;"></textarea>
+                        </td>
+                        <td>
+                            <button type="submit" class="btn btn-sm btn-success">
+                                <i class="fas fa-check me-1"></i> Complete
+                            </button>
+                        </td>
+                    </tr>
+                </form>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 📱 Mobile Cards -->
+    <div class="d-md-none">
+        {% for log in in_progress_logs %}
+        <div class="card mb-3 border-warning border-2 shadow-sm">
+            <div class="card-body">
+                <h6 class="fw-bold">{{ log.task }} — {{ log.vehicle_reg }}</h6>
+                <p class="mb-1"><strong>Started At:</strong> {{ log.start_time.strftime('%A %d/%m/%Y %H:%M') }}</p>
+                <form method="POST" action="/worklogs/mot/complete/{{ log.id }}">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1"><strong>Add Notes:</strong></label>
+                        <textarea name="notes" class="form-control form-control-sm auto-grow" rows="1"
+                            oninput="autoGrow(this)" style="resize: none;"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-success w-100">
+                        <i class="fas fa-check me-1"></i> Complete Task
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 📋 Worklogs Dropdown with Count -->
+    <div class="mt-5">
+        <button class="btn btn-outline-primary px-4 py-2 fw-semibold mb-3 d-flex align-items-center gap-2" type="button"
+            data-bs-toggle="collapse" data-bs-target="#worklogsCollapse" aria-expanded="false"
+            aria-controls="worklogsCollapse">
+            <span>Show/Hide My Worklogs</span>
+            <span class="badge bg-secondary">{{ logs|length }}</span>
+        </button>
+
+        <div class="collapse" id="worklogsCollapse">
+            <!-- 🖥 Desktop Table -->
+            <div class="table-responsive d-none d-md-block">
+                <table class="table table-hover table-borderless align-middle mb-0">
+                    <thead class="table-light text-uppercase small text-secondary">
+                        <tr>
+                            <th>Date</th>
+                            <th>Vehicle Reg</th>
+                            <th>Task</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th style="min-width: 150px;">Notes</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr class="{% if log.status == 'in_progress' %}table-warning{% endif %}">
+                            <td class="text-nowrap">{{ log.start_time.strftime("%a %d/%m/%y") }}</td>
+                            <td class="fw-medium">{{ log.vehicle_reg }}</td>
+                            <td>{{ log.task }}</td>
+                            <td>{{ log.start_time.strftime("%H:%M") }}</td>
+                            <td>
+                                {% if log.end_time %}
+                                {{ log.end_time.strftime("%H:%M") }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted small" style="white-space: pre-wrap; word-break: break-word;">
+                                {{ log.notes or "-" }}
+                            </td>
+                            <td>
+                                <span
+                                    class="badge {% if log.status == 'completed' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                    {{ log.status|capitalize }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if log.technician == technician %}
+                                <form method="POST" action="{{ url_for('delete_mot_log', log_id=log.id) }}"
+                                    onsubmit="return confirm('Are you sure you want to delete this log?');"
+                                    class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">No logs this month.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 📱 Mobile Cards -->
+            <div class="d-md-none mt-3">
+                {% for log in logs %}
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body p-3">
+                        <h6 class="fw-bold mb-1">{{ log.task }} — {{ log.vehicle_reg }}</h6>
+                        <p class="mb-1"><strong>Date:</strong> {{ log.start_time.strftime("%A %d/%m/%Y") }}</p>
+                        <p class="mb-1"><strong>Start:</strong> {{ log.start_time.strftime("%H:%M") }} |
+                            <strong>End:</strong>
+                            {% if log.end_time %}
+                            {{ log.end_time.strftime("%H:%M") }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </p>
+                        <p class="mb-2"><strong>Notes:</strong> {{ log.notes or "-" }}</p>
+                        <p class="mb-1">
+                            <span
+                                class="badge {% if log.status == 'completed' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {{ log.status|capitalize }}
+                            </span>
+                        </p>
+                        {% if log.technician == technician %}
+                        <form method="POST" action="{{ url_for('delete_mot_log', log_id=log.id) }}"
+                            onsubmit="return confirm('Are you sure you want to delete this log?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger w-100 mt-2">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted text-center">No logs this month.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {% if completed_tasks %}
+    <div class="mt-5">
+        <button class="btn btn-outline-secondary mb-3 px-4 py-2 fw-semibold d-flex align-items-center gap-2"
+            type="button" data-bs-toggle="collapse" data-bs-target="#completedTaskToggle" aria-expanded="false"
+            aria-controls="completedTaskToggle">
+            <span>Show/Hide Completed Assigned Tasks</span>
+            <span class="badge bg-secondary">{{ completed_tasks|length }}</span>
+        </button>
+
+        <div class="collapse" id="completedTaskToggle">
+            <h4 class="mt-3">✅ Completed Assigned Tasks</h4>
+            <div class="accordion" id="completedTasksAccordion">
+                {% for task in completed_tasks %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="completed-heading-{{ task.id }}">
+                        <button
+                            class="accordion-button collapsed d-flex justify-content-between align-items-center w-100"
+                            type="button" data-bs-toggle="collapse" data-bs-target="#completed-collapse-{{ task.id }}"
+                            aria-expanded="false" aria-controls="completed-collapse-{{ task.id }}">
+                            <div>
+                                <strong>{{ task.title }}</strong>
+                                {% if task.contact_name %}
+                                <span class="ms-2">for {{ task.contact_name }}</span>
+                                {% endif %}
+                                <span class="text-muted ms-2">{{ task.created_at.strftime('%d %b %Y %H:%M') }}</span>
+                            </div>
+                            <i class="ms-3 toggle-icon fas fa-plus"></i>
+                        </button>
+                    </h2>
+                    <div id="completed-collapse-{{ task.id }}" class="accordion-collapse collapse"
+                        aria-labelledby="completed-heading-{{ task.id }}" data-bs-parent="#completedTasksAccordion">
+                        <div class="accordion-body">
+                            <p>{{ task.description }}</p>
+
+                            {% if task.vehicle_reg %}
+                            <p><strong>Vehicle Reg:</strong> {{ task.vehicle_reg }}</p>
+                            {% endif %}
+                            {% if task.contact_name %}
+                            <p><strong>Contact Name:</strong> {{ task.contact_name }}</p>
+                            {% endif %}
+                            {% if task.contact_number %}
+                            <p><strong>Contact Number:</strong> {{ task.contact_number }}</p>
+                            {% endif %}
+                            {% if task.contact_address %}
+                            <p><strong>Contact Address:</strong> {{ task.contact_address }}</p>
+                            {% endif %}
+                            {% if task.contact_notes %}
+                            <p><strong>Contact Notes:</strong> {{ task.contact_notes }}</p>
+                            {% endif %}
+                            {% if task.assigned_to %}
+                            <p><strong>Completed by:</strong> {{ task.assigned_to }}</p>
+                            {% endif %}
+                            {% if task.start_time %}
+                            <p><strong>Begin Time:</strong> {{ task.start_time.strftime('%A, %d-%m-%Y %H:%M:%S') }}</p>
+                            {% endif %}
+                            {% if task.complete_time %}
+                            <p><strong>Complete Time:</strong> {{ task.complete_time.strftime('%A, %d-%m-%Y %H:%M:%S')
+                                }}</p>
+                            {% endif %}
+
+                            {% if task.images %}
+                            <div class="mt-3 d-flex flex-wrap gap-3">
+                                {% for image in task.images %}
+                                <a href="{{ url_for('static', filename='uploads/' ~ image.filename) }}"
+                                    class="glightbox" data-gallery="completed-task-gallery-{{ task.id }}"
+                                    data-title="Task: {{ task.title }} - Image {{ loop.index }}">
+                                    <img src="{{ url_for('static', filename='uploads/' ~ image.filename) }}"
+                                        alt="Task Image" class="img-thumbnail" style="max-width: 200px;">
+                                </a>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- ✅ Modal for Confirmation -->
+<div class="modal fade" id="confirmStartModal" tabindex="-1" aria-labelledby="confirmStartModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" id="startTaskForm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmStartModalLabel">Confirm Start</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to begin this task?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+                    <button type="submit" class="btn btn-primary">Yes, Start Task</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="text-center mb-4">
+    <p class="fw-bold text-danger">DONT FORGET TO DOWNLOAD YOUR WORK EVERY MONTH.</p>
+</div>
+
+<!-- 🖨 PDF Export -->
+<div class="text-center mb-4">
+    <form method="GET" action="/download_mot_logs">
+        <button type="submit" class="btn btn-outline-secondary px-4 py-2">
+            <i class="fas fa-file-download me-1"></i> Download My Monthly Logs (PDF)
+        </button>
+    </form>
+</div>
+
+<div class="modal fade" id="confirmCompleteModal" tabindex="-1" aria-labelledby="confirmCompleteModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" id="completeTaskForm">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="confirmCompleteModalLabel">Confirm Completion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to complete this task?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+                    <button type="submit" class="btn btn-success">Yes, Complete</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 👇 Custom style to hide Bootstrap's default accordion arrow -->
+<style>
+    .accordion-button::after {
+        display: none !important;
+    }
+</style>
+
+<script>
+    document.getElementById('confirmStartModal').addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const taskId = button.getAttribute('data-task-id');
+        const form = document.getElementById('startTaskForm');
+        form.action = `/mot/accept_task/${taskId}`;
+    });
+
+    document.getElementById('confirmCompleteModal').addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const taskId = button.getAttribute('data-task-id');
+        const form = document.getElementById('completeTaskForm');
+        form.action = `/mot/complete_task/${taskId}`;
+    });
+
+    function autoGrow(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }
+
+    // Toggle icon based on accordion state (Assigned Tasks)
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('#assignedTasksAccordion .accordion-button').forEach(button => {
+            button.addEventListener('click', function () {
+                const icon = this.querySelector('.toggle-icon');
+                const expanded = this.classList.contains('collapsed');
+                icon.classList.toggle('fa-plus', expanded);
+                icon.classList.toggle('fa-minus', !expanded);
+            });
+        });
+    });
+</script>
+
+<script>
+    // Toggle icon based on accordion state (Completed Tasks)
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('#completedTasksAccordion .accordion-button').forEach(button => {
+            button.addEventListener('click', function () {
+                const icon = this.querySelector('.toggle-icon');
+                const isCollapsed = this.classList.contains('collapsed');
+                icon.classList.toggle('fa-plus', isCollapsed);
+                icon.classList.toggle('fa-minus', !isCollapsed);
+            });
+        });
+    });
+</script>
+
+<!-- GLightbox assets -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
+<script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+<script>
+    const lightbox = GLightbox({
+        selector: '.glightbox',
+        touchNavigation: true,
+        loop: true,
+        zoomable: true
+    });
+</script>
+
+{% endblock %}

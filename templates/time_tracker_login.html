@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-5">
+
+  <!-- 👋 Intro -->
+  <div class="text-center mb-4">
+    <h2 class="fw-bold mb-2"><i class="fas fa-user-clock me-2 text-primary"></i>Employee Time Tracker Login</h2>
+    <p class="text-muted fs-5">Staff can securely clock in/out using their assigned credentials. Logging your hours ensures accurate pay and accountability.</p>
+  </div>
+
+  <!-- 💬 Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} rounded-pill text-center shadow-sm">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- 📝 Login Card -->
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-4">
+          <form method="POST">
+            <!-- Username -->
+            <div class="mb-3">
+              <label for="username" class="form-label fw-semibold">Username</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-user"></i></span>
+                <input type="text" name="username" class="form-control" placeholder="Enter your username" required>
+              </div>
+            </div>
+
+            <!-- Password -->
+            <div class="mb-3">
+              <label for="timeTrackerLoginPassword" class="form-label fw-semibold">Password</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                <input type="password" name="password" id="timeTrackerLoginPassword" class="form-control" placeholder="Enter your password" required>
+              </div>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="showTTLoginPw" onclick="togglePassword('timeTrackerLoginPassword')">
+                <label class="form-check-label" for="showTTLoginPw">Show Password</label>
+              </div>
+            </div>
+
+            <!-- Login Button -->
+            <div class="d-grid mt-4">
+              <button type="submit" class="btn btn-primary rounded-pill py-2 fs-5 shadow-sm">
+                <i class="fas fa-sign-in-alt me-2"></i>Login
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ℹ️ Info -->
+      <div class="alert alert-info mt-4 rounded-3 text-center">
+        <i class="fas fa-info-circle me-1"></i>
+        Forgot your credentials? Please contact your team lead or administrator.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 👁 Show/Hide Password -->
+<script>
+  function togglePassword(fieldId) {
+    const input = document.getElementById(fieldId);
+    if (input) {
+      input.type = input.type === "password" ? "text" : "password";
+    }
+  }
+</script>
+{% endblock %}

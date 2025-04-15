@@ -1,0 +1,335 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-5">
+
+    <!-- 🔔 Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <h2 class="d-flex justify-content-between align-items-center">
+        <span>📤 Assign Work</span>
+        <span>
+            <a href="{{ url_for('manage_assigned_tasks') }}" class="btn btn-primary btn-sm rounded-pill me-2">
+                🔧 Manage Tasks
+            </a>
+            <a href="{{ url_for('select_completed_department') }}" class="btn btn-primary btn-sm rounded-pill">
+                📄 Completed Tasks
+            </a>
+        </span>
+    </h2>
+
+    <p>Send jobs directly to a department.</p>
+
+    <!-- ✅ START FORM -->
+    <form method="POST" enctype="multipart/form-data">
+
+
+        <!-- Select Department -->
+        <div class="mb-3">
+            <label for="department" class="form-label">Select Department</label>
+            <select class="form-select" name="department" id="departmentSelect" onchange="showTechnicianOptions()"
+                required>
+                <option value="" disabled selected>Select department</option>
+                {% for dept in departments %}
+                <option value="{{ dept }}">{{ dept.replace('-', ' ').title() }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Optional Technician Dropdown -->
+        <div class="mb-3" id="technicianField" style="display: none;">
+            <label for="assigned_to" class="form-label">Assign to Specific Technician (Optional)</label>
+            <select name="assigned_to" class="form-select" id="technicianSelect">
+                <option value="" selected>-- None --</option>
+                {% for tech in technicians %}
+                <option value="{{ tech.username }}" data-department="{{ tech.department }}">
+                    {{ tech.username }} ({{ tech.department.title() }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Job Title</label>
+            <select name="title" class="form-select" id="jobSelect" required>
+                <option value="" disabled selected>Select a job</option>
+                <!-- Options will be injected dynamically by JS -->
+                <option value="custom">Custom (enter manually)</option>
+            </select>
+        </div>
+
+        <!-- Add this code after your job title selection (before the description field) -->
+        <div id="deliveryCollectionFields" class="mb-3" style="display: none;">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <strong>Delivery/Collection Details</strong>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Vehicle Registration</label>
+                    <input type="text" name="vehicle_reg" class="form-control" id="vehicleRegField">
+                </div>
+                
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Customer/Contact Name</label>
+                        <input type="text" name="contact_name" class="form-control" id="contactNameField">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Contact Number</label>
+                        <input type="tel" name="contact_number" class="form-control" id="contactNumberField">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea name="contact_address" class="form-control" rows="3"
+                            id="contactAddressField"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Additional Notes</label>
+                        <textarea name="contact_notes" class="form-control" rows="2" id="contactNotesField"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3" id="customTitleField" style="display: none;">
+            <label class="form-label">Custom Job Title</label>
+            <input type="text" name="custom_title" class="form-control">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Upload Image(s)</label>
+            <input type="file" name="images" id="imageInput" class="form-control" accept="image/*" multiple
+                onchange="previewImages(event)">
+            <small class="form-text text-muted">
+                You can select multiple images (JPG/PNG only). Previews will appear below.
+            </small>
+            <div class="mt-1 text-info" id="image-count">Selected: 0 / 5 images</div>
+
+            <!-- Live Previews -->
+            <div id="image-preview" class="mt-3 d-flex flex-wrap gap-3"></div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea name="description" class="form-control" rows="4" required></textarea>
+        </div>
+
+        <!-- ✅ FIX: Add this at the end of your form -->
+        <div class="text-end">
+            <button type="submit" class="btn btn-primary">Send Task</button>
+        </div>
+    </form> <!-- ✅ Close the form here -->
+
+
+    <script id="job-titles-json" type="application/json">
+        {{ department_job_titles | tojson | safe }}
+        </script>
+        
+        <script>
+        // Job titles dropdown functionality
+        const jobSelect = document.getElementById("jobSelect");
+        const departmentSelect = document.getElementById("departmentSelect");
+        const customField = document.getElementById("customTitleField");
+        
+        const jobTitlesRaw = document.getElementById("job-titles-json").textContent;
+        const jobTitlesByDept = JSON.parse(jobTitlesRaw);
+        
+        departmentSelect.addEventListener("change", () => {
+          const selectedDept = departmentSelect.value;
+          const options = jobTitlesByDept[selectedDept] || [];
+        
+          // Clear jobSelect except for "custom"
+          while (jobSelect.options.length > 1) {
+            jobSelect.remove(0);
+          }
+        
+          options.forEach(title => {
+            const opt = document.createElement("option");
+            opt.value = title;
+            opt.textContent = title;
+            jobSelect.insertBefore(opt, jobSelect.lastElementChild); // before custom
+          });
+        
+          jobSelect.selectedIndex = 0;
+          customField.style.display = "none";
+        });
+        
+        jobSelect.addEventListener("change", function() {
+          customField.style.display = this.value === "custom" ? "block" : "none";
+        });
+        </script>
+        
+        <script>
+            // Get existing elements for delivery/collection
+            const deliveryCollectionFields = document.getElementById("deliveryCollectionFields");
+          
+            // Function to check if we need to show delivery/collection fields
+            function checkDeliveryCollectionFields() {
+              const selectedJob = jobSelect.value;
+          
+              const fields = [
+                document.getElementById("contactNameField"),
+                document.getElementById("contactNumberField"),
+                document.getElementById("contactAddressField"),
+                document.getElementById("vehicleRegField")
+              ];
+          
+              if (selectedJob === "Collection" || selectedJob === "Delivery") {
+                deliveryCollectionFields.style.display = "block";
+                fields.forEach(field => field.required = true);
+              } else {
+                deliveryCollectionFields.style.display = "none";
+                fields.forEach(field => field.required = false);
+              }
+            }
+          
+            // Add event listener to job select
+            jobSelect.addEventListener("change", checkDeliveryCollectionFields);
+          
+            // Also check when department changes (as it resets job options)
+            departmentSelect.addEventListener("change", function () {
+              setTimeout(checkDeliveryCollectionFields, 100);
+            });
+          
+            // Initial check on page load
+            checkDeliveryCollectionFields();
+          </script>          
+        
+        <script>
+        let selectedFiles = [];
+        const MAX_IMAGES = 5;
+        
+        function previewImages(event, isDelete = false) {
+            const input = event.target || document.getElementById('imageInput');
+            const previewContainer = document.getElementById('image-preview');
+            const imageCountText = document.getElementById('image-count');
+        
+            // Only read new files if this is not a delete event
+            if (!isDelete) {
+                const newFiles = Array.from(input.files);
+        
+                if (selectedFiles.length + newFiles.length > MAX_IMAGES) {
+                    alert(`🚫 You can only upload up to ${MAX_IMAGES} images.`);
+                    input.value = '';
+                    return;
+                }
+        
+                selectedFiles = selectedFiles.concat(newFiles);
+            }
+        
+            previewContainer.innerHTML = '';
+        
+            selectedFiles.forEach((file, index) => {
+                if (!file.type.startsWith('image/')) return;
+        
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const wrapper = document.createElement('div');
+                    wrapper.classList.add('position-relative');
+        
+                    const anchor = document.createElement('a');
+                    anchor.href = e.target.result;
+                    anchor.classList.add('glightbox');
+                    anchor.setAttribute('data-gallery', 'upload-preview');
+                    anchor.setAttribute('data-title', file.name);
+                    anchor.setAttribute('data-type', 'image');
+        
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.alt = file.name;
+                    img.style.maxWidth = '150px';
+                    img.classList.add('img-thumbnail', 'shadow-sm', 'me-2');
+        
+                    anchor.appendChild(img);
+                    wrapper.appendChild(anchor);
+        
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.innerHTML = '×';
+                    deleteBtn.className = 'btn btn-sm btn-danger position-absolute top-0 end-0';
+                    deleteBtn.onclick = function () {
+                        selectedFiles.splice(index, 1);
+                        updateFileInput(input);
+                        previewImages({ target: input }, true);
+                    };
+        
+                    wrapper.appendChild(deleteBtn);
+                    previewContainer.appendChild(wrapper);
+                };
+                reader.readAsDataURL(file);
+            });
+        
+            updateFileInput(input);
+            imageCountText.textContent = `Selected: ${selectedFiles.length} / ${MAX_IMAGES} images`;
+        
+            setTimeout(() => {
+                GLightbox({
+                    selector: '.glightbox',
+                    touchNavigation: true,
+                    loop: true,
+                    zoomable: true
+                });
+            }, 100);
+        }
+        
+        function updateFileInput(input) {
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach(file => dataTransfer.items.add(file));
+            input.files = dataTransfer.files;
+        }
+        </script>
+        
+        <!-- GLightbox CSS -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css">
+        
+        <!-- GLightbox JS -->
+        <script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+        
+        <script>
+        function showTechnicianOptions() {
+            const selectedDept = document.getElementById('departmentSelect').value;
+            const technicianField = document.getElementById('technicianField');
+        
+            if (selectedDept) {
+                technicianField.style.display = 'block';
+            } else {
+                technicianField.style.display = 'none';
+            }
+        }
+        </script>
+        
+        <script>
+        document.getElementById("departmentSelect").addEventListener("change", function () {
+            const selectedDept = this.value;
+            const techSelect = document.getElementById("technicianSelect");
+            const options = techSelect.options;
+        
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                const dept = option.getAttribute("data-department");
+        
+                if (!dept || dept === selectedDept) {
+                    option.style.display = "block";
+                } else {
+                    option.style.display = "none";
+                }
+            }
+        
+            techSelect.value = ""; // Reset technician select
+        });
+        </script>
+
+    {% endblock %}

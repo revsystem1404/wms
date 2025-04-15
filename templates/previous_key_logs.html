@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h1>Previous Key Logs</h1>
+        <a href="/vehicle_key_monitor" class="btn btn-primary mb-3">Back to Vehicle Key Monitor</a>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Employee</th>
+                    <th scope="col">Key Number</th>
+                    <th scope="col">Key Checkout Time</th>
+                    <th scope="col">Key Return Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vehicle_key in vehicle_keys %}
+                <tr>
+                    <td>{{ vehicle_key.employee.name }}</td>
+                    <td>{{ vehicle_key.key_number }}</td>
+                    <td>{{ vehicle_key.key_checkout_time.strftime('%d-%m-%Y %H:%M:%S') }}</td>
+                    <td>
+                        {% if vehicle_key.key_return_time %}
+                            {{ vehicle_key.key_return_time.strftime('%d-%m-%Y %H:%M:%S') }}
+                        {% else %}
+                            Not Returned
+                        {% endif %}
+                    </td>
+                    
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

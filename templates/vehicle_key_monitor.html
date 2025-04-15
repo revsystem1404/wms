@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-5">
+
+    <!-- 🔒 Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+                    <i class="fas fa-info-circle me-2"></i> {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Header and Logout -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">🔑 JC AUTO Vehicle Key Monitor</h2>
+        <a href="{{ url_for('vehicle_key_logout') }}" class="btn btn-outline-danger">
+            <i class="fas fa-sign-out-alt me-1"></i> Logout
+        </a>
+    </div>
+
+    <!-- 🚗 Hand Over Key Form -->
+    <form method="POST" action="/add_vehicle_key" class="card card-body shadow-sm border-0 mb-4">
+        <div class="mb-3">
+            <label for="employee_id" class="form-label fw-semibold">Select Employee</label>
+            <select name="employee_id" id="employee_id" class="form-select" required>
+                <option value="" disabled selected>Select Employee</option>
+                {% for employee in employees %}
+                    <option value="{{ employee.id }}">{{ employee.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="key_number" class="form-label fw-semibold">Key Identifier</label>
+            <input type="text" name="key_number" id="key_number" class="form-control" placeholder="Enter Reg or Last 5 Digits" maxlength="8" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+            <i class="fas fa-key me-1"></i> Hand Over Key
+        </button>
+    </form>
+
+    <!-- 🔁 Actions -->
+    <div class="d-flex gap-2 mb-4">
+        <a href="/export_vehicle_keys" class="btn btn-success">
+            <i class="fas fa-file-excel me-1"></i> Download Excel Report
+        </a>
+        <a href="/previous_key_logs" class="btn btn-secondary">
+            <i class="fas fa-history me-1"></i> Previous Key Logs
+        </a>
+    </div>
+
+    <!-- 🧾 Table -->
+    <div class="table-responsive">
+        <h4 class="mb-3">📋 Vehicle Key Log</h4>
+        <table class="table table-hover align-middle table-bordered shadow-sm">
+            <thead class="table-light">
+                <tr class="text-center">
+                    <th>Employee</th>
+                    <th>Key Number</th>
+                    <th>Checkout Time</th>
+                    <th>Return Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vehicle_key in vehicle_keys %}
+                <tr class="text-center">
+                    <td class="fw-semibold">{{ vehicle_key.employee.name }}</td>
+                    <td><span class="badge bg-info text-dark">{{ vehicle_key.key_number }}</span></td>
+                    <td>{{ vehicle_key.key_checkout_time.strftime('%d-%m-%Y %H:%M:%S') }}</td>
+                    <td>
+                        {% if vehicle_key.key_return_time %}
+                            {{ vehicle_key.key_return_time.strftime('%d-%m-%Y %H:%M:%S') }}
+                        {% else %}
+                            <span class="text-muted">Not Returned</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not vehicle_key.key_return_time %}
+                            <a href="/return_vehicle_key/{{ vehicle_key.id }}" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-undo-alt me-1"></i> Return Key
+                            </a>
+                        {% else %}
+                            <span class="badge bg-success text-white px-3 py-2">Returned</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,709 @@
+{% extends "layout.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ category }} fade show" role="alert">
+    <i class="fas fa-info-circle"></i> {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="text-end">
+        <span id="liveClock" class="fw-bold text-primary"></span>
+    </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+            document.getElementById("liveClock").innerText = now.toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+    <div class="d-flex justify-content-between">
+        <h1>Admin Dashboard</h1>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+
+
+    <p>Welcome to the Workforce Managing System (WMS) Admin Dashboard! You can manage employees and view their clock-in/out logs here.</p>
+
+    <!-- 🚀 Add Employee Form -->
+    <div class="card shadow-sm rounded-4 border-0 mb-5">
+        <div class="card-body p-4">
+            <h4 class="fw-bold mb-3 text-primary"><i class="fas fa-user-plus me-2"></i>Add New Employee</h4>
+            <p class="text-muted mb-4">
+                Use this form to register a new employee into the system. Make sure the name and hourly rate are
+                accurate to ensure correct tracking of work logs and payroll calculations.
+            </p>
+
+            <form method="POST" action="/admin_dashboard">
+                <!-- Employee Name -->
+                <div class="mb-3">
+                    <label for="name" class="form-label fw-semibold">Employee Name</label>
+                    <input type="text" id="name" name="name" class="form-control form-control-lg rounded-pill"
+                        placeholder="Enter full name" required>
+                </div>
+
+                <!-- Hourly Rate -->
+                <div class="mb-4">
+                    <label for="hourly_rate" class="form-label fw-semibold">Hourly Rate (£)</label>
+                    <input type="number" id="hourly_rate" name="hourly_rate"
+                        class="form-control form-control-lg rounded-pill" placeholder="e.g. 12.50" step="0.01" required>
+                </div>
+
+                <!-- Submit -->
+                <button type="submit" class="btn btn-primary rounded-pill px-4 py-2">
+                    <i class="fas fa-plus me-1"></i> Add Employee
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <hr>
+
+    <h3 class="mb-4">Employee Logs</h3>
+
+    <div class="row g-4">
+        {% for employee in employees %}
+        <div class="col-12" data-employee-id="{{ employee.id }}">
+            <div class="card shadow-sm rounded-4 p-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+                    <div>
+                        <h5 class="mb-1">{{ employee.name }}</h5>
+                        <small class="text-muted">Rate: £{{ "%.2f"|format(employee.hourly_rate) }}/hr</small>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="/edit_employee/{{ employee.id }}" class="btn btn-primary">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+
+                        <a href="/download_employee_pdf/{{ employee.id }}" class="btn btn-secondary">
+                            <i class="fas fa-file-pdf"></i>
+                        </a>
+
+                        <!-- Updated: Delete Logs Trigger -->
+                        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal"
+                            data-action="/delete_employee_logs/{{ employee.id }}"
+                            data-message="Delete all logs for {{ employee.name }}?">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+
+                        <!-- Updated: Remove Employee Trigger -->
+                        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal"
+                            data-action="/remove_employee/{{ employee.id }}"
+                            data-message="Remove {{ employee.name }} from the system?">
+                            <i class="fas fa-user-minus"></i>
+                        </button>
+                    </div>
+
+                    <!-- Centered "Show Logs" Button -->
+                    <div class="w-100 text-center mt-3">
+                        <button class="btn btn-outline-primary rounded-pill px-4 py-1 toggle-log-btn" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#employeeLogs{{ employee.id }}"
+                            aria-expanded="false" aria-controls="employeeLogs{{ employee.id }}"
+                            id="logToggleBtn{{ employee.id }}">
+                            <i class="fas fa-clock me-1"></i> Show Logs
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 🔽 Employee Logs Toggle Area -->
+                <div class="collapse mt-3" id="employeeLogs{{ employee.id }}">
+                    {% if employee.sessions %}
+
+                    {# Group sessions by week #}
+                    {% set sessions_by_week = {} %}
+                    {% for session in employee.sessions %}
+                    {% set week_key = session.clock_in.strftime('%Y-%W') %}
+                    {% if week_key not in sessions_by_week %}
+                    {% set _ = sessions_by_week.update({week_key: []}) %}
+                    {% endif %}
+                    {% set _ = sessions_by_week[week_key].append(session) %}
+                    {% endfor %}
+
+                    {# Render each week's sessions with toggle #}
+                    {% for week_key, week_sessions in sessions_by_week.items() %}
+                    {% set week_label = week_sessions[0].clock_in.strftime('Week of %d %B %Y') %}
+                    <div class="mb-2">
+                        <button class="btn btn-outline-secondary btn-sm w-100 text-start" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#weekSessions{{ employee.id }}{{ loop.index }}"
+                            aria-expanded="false" aria-controls="weekSessions{{ employee.id }}{{ loop.index }}">
+                            📅 {{ week_label }}
+                        </button>
+
+                        <div class="collapse mt-2" id="weekSessions{{ employee.id }}{{ loop.index }}">
+                            {% for session in week_sessions %}
+                            <form method="POST" action="/update_session/{{ session.id }}"
+                                class="border rounded p-3 mb-3 bg-light">
+                                <div class="row g-3 align-items-center">
+                                    <div class="col-md-3">
+                                        <div class="text-muted small">{{ session.clock_in.strftime('%A, %d %B %Y') }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label mb-1">Clock In</label>
+                                        <input type="datetime-local" name="clock_in"
+                                            value="{{ session.clock_in.strftime('%Y-%m-%dT%H:%M') }}"
+                                            class="form-control form-control-sm" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label mb-1">Clock Out</label>
+                                        <input type="datetime-local" name="clock_out"
+                                            value="{{ session.clock_out.strftime('%Y-%m-%dT%H:%M') if session.clock_out else '' }}"
+                                            class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-1 d-grid">
+                                        <button type="submit" class="btn btn-sm btn-success mt-4">
+                                            <i class="fas fa-save"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% else %}
+                    <p class="text-muted">No Work Sessions</p>
+                    {% endif %}
+                </div>
+
+                {% set latest_session = employee.sessions[-1] if employee.sessions else None %}
+                {% if not latest_session or latest_session.clock_out %}
+                <button onclick="showClockInForm('{{ employee.id }}')" class="btn btn-sm btn-info mt-2 me-2">
+                    <i class="fas fa-sign-in-alt"></i> Manual Clock-In
+                </button>
+                {% endif %}
+                {% if latest_session and not latest_session.clock_out %}
+                <button onclick="showClockOutForm('{{ employee.id }}')" class="btn btn-sm btn-warning mt-2">
+                    <i class="fas fa-clock"></i> Manual Clock-Out
+                </button>
+                {% endif %}
+
+                <hr>
+
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="fw-bold text-muted small">Total Hours</div>
+                        <div>{{ employee.total_worked_hours }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="fw-bold text-muted small">Total Pay</div>
+                        <div>£{{ "%.2f"|format(employee.pay) }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="fw-bold text-muted small">Overtime</div>
+                        {% if employee.monthly_overtime > 20 %}
+                        <span class="badge bg-danger">{{ employee.monthly_overtime }} hrs</span>
+                        {% elif employee.monthly_overtime >= 10 %}
+                        <span class="badge bg-warning text-dark">{{ employee.monthly_overtime }} hrs</span>
+                        {% else %}
+                        <span class="badge bg-success">{{ employee.monthly_overtime }} hrs</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <div class="fw-bold text-muted small">Overtime Pay</div>
+                        <span class="text-success">+£{{ "%.2f"|format(employee.overtime_pay) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 🔽 Toggle Button for Vehicle Key Monitor Section -->
+    <div class="text-center my-4">
+        <button class="btn btn-outline-primary rounded-pill px-4 py-2 fs-6 fw-semibold shadow-sm toggle-section-btn"
+            type="button" data-bs-toggle="collapse" data-bs-target="#vehicleKeySection" aria-expanded="false"
+            aria-controls="vehicleKeySection" id="toggleVehicleKeyBtn">
+            <i class="fas fa-key me-2"></i> Show Vehicle Key Monitor
+        </button>
+    </div>
+
+    <!-- 🔽 Toggleable Section -->
+    <div class="collapse" id="vehicleKeySection">
+
+        <!-- 💾 Register Form Card -->
+        <div class="card shadow-lg rounded-4 p-4 mb-5 border-0 bg-light">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-user-lock fa-lg text-success me-2"></i>
+                <h4 class="mb-0">Register Vehicle Key Monitor User</h4>
+            </div>
+
+            <form method="POST" action="/register_vehicle_key_user" class="mt-3">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label for="username" class="form-label fw-bold">Username</label>
+                        <input type="text" name="username" id="username" class="form-control form-control-lg shadow-sm"
+                            placeholder="e.g. john.doe" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="vehicleKeyPassword" class="form-label fw-bold">Password</label>
+                        <input type="password" name="password" id="vehicleKeyPassword"
+                            class="form-control form-control-lg shadow-sm" placeholder="••••••••" required>
+
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="showVKPw"
+                                onclick="togglePassword('vehicleKeyPassword')">
+                            <label class="form-check-label" for="showVKPw">Show Password</label>
+                        </div>
+                    </div>
+
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-success btn-lg px-4 shadow-sm mt-2">
+                            <i class="fas fa-user-plus me-2"></i> Register User
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 📋 Registered Users Table -->
+        <div class="card shadow-lg rounded-4 p-4 border-0">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-users fa-lg text-primary me-2"></i>
+                <h4 class="mb-0">Registered Users</h4>
+            </div>
+
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col"><i class="fas fa-user me-1"></i> Username</th>
+                        <th scope="col" class="text-end"><i class="fas fa-cogs me-1"></i> Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in vehicle_key_users %}
+                    <tr>
+                        <td class="fw-semibold">{{ user.username }}</td>
+                        <td class="text-end">
+                            <a href="/remove_vehicle_key_user/{{ user.id }}"
+                                class="btn btn-outline-danger btn-sm px-3 shadow-sm">
+                                <i class="fas fa-trash-alt me-1"></i> Remove
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2" class="text-center text-muted py-3">
+                            <i class="fas fa-info-circle me-2"></i> No vehicle key users registered yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <hr class="my-5">
+    </div>
+
+
+    <!-- 🔽 Toggle Button for Employee Time Tracker -->
+    <div class="text-center my-4">
+        <button class="btn btn-outline-primary rounded-pill px-4 py-2 fs-6 fw-semibold shadow-sm toggle-section-btn"
+            type="button" data-bs-toggle="collapse" data-bs-target="#timeTrackerSection" aria-expanded="false"
+            aria-controls="timeTrackerSection" id="toggleTimeTrackerBtn">
+            <i class="fas fa-stopwatch me-2"></i> Show Employee Time Tracker
+        </button>
+    </div>
+
+    <!-- 🔽 Toggleable Section -->
+    <div class="collapse" id="timeTrackerSection">
+
+        <!-- 📝 Register Time Tracker User -->
+        <div class="card shadow-lg rounded-4 p-4 mb-5 border-0 bg-light">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-user-clock fa-lg text-info me-2"></i>
+                <h4 class="mb-0">Register Employee Time Tracker User</h4>
+            </div>
+
+            <form method="POST" action="/register_time_tracker_user" class="mt-3">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label for="username" class="form-label fw-bold">Username</label>
+                        <input type="text" name="username" id="username" class="form-control form-control-lg shadow-sm"
+                            placeholder="e.g. jane.doe" required>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="timeTrackerPassword" class="form-label fw-bold">Password</label>
+                        <input type="password" name="password" id="timeTrackerPassword"
+                            class="form-control form-control-lg shadow-sm" placeholder="••••••••" required>
+
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="showTTPw"
+                                onclick="togglePassword('timeTrackerPassword')">
+                            <label class="form-check-label" for="showTTPw">Show Password</label>
+                        </div>
+                    </div>
+
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-primary btn-lg px-4 shadow-sm mt-2">
+                            <i class="fas fa-user-plus me-2"></i> Register User
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 👥 Registered Users Table -->
+        <div class="card shadow-lg rounded-4 p-4 border-0">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-users fa-lg text-dark me-2"></i>
+                <h4 class="mb-0">Registered Time Tracker Users</h4>
+            </div>
+
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th><i class="fas fa-user me-1"></i> Username</th>
+                        <th class="text-end"><i class="fas fa-cogs me-1"></i> Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in time_tracker_users %}
+                    <tr>
+                        <td class="fw-semibold">{{ user.username }}</td>
+                        <td class="text-end">
+                            <a href="/remove_time_tracker_user/{{ user.id }}"
+                                class="btn btn-outline-danger btn-sm px-3 shadow-sm">
+                                <i class="fas fa-trash-alt me-1"></i> Remove
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2" class="text-center text-muted py-3">
+                            <i class="fas fa-info-circle me-2"></i> No time tracker users registered yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <hr class="my-5">
+    </div>
+
+    <!-- 🔽 Toggle Button for Department User -->
+    <div class="text-center my-4">
+        <button class="btn btn-outline-dark rounded-pill px-5 py-2 fs-6 fw-semibold shadow-sm toggle-section-btn"
+            type="button" data-bs-toggle="collapse" data-bs-target="#departmentUserSection" aria-expanded="false"
+            aria-controls="departmentUserSection" id="toggleDepartmentUserBtn">
+            <i class="fas fa-building me-2"></i> Show Department Users
+        </button>
+    </div>
+
+    <!-- 🔽 Toggleable Section -->
+    <div class="collapse" id="departmentUserSection">
+
+        <!-- 📝 Register Department User -->
+        <div class="card shadow-lg rounded-4 p-4 mb-5 border-0 bg-light">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-user-plus fa-lg text-success me-2"></i>
+                <h4 class="mb-0">Register Department User</h4>
+            </div>
+
+            <form method="POST" action="/register_department_user" class="mt-3">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold" for="department">Select Department</label>
+                        <select name="department" class="form-select form-select-lg shadow-sm" required>
+                            <option value="" disabled selected>Select</option>
+                            <option value="mot">MOT</option>
+                            <option value="prep">Prep</option>
+                            <option value="service">Service</option>
+                            <option value="body-shop">Body Shop</option>
+                            <option value="reg-advert">Reg & Advert</option>
+                            <option value="sold">Sold</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold" for="username">Username</label>
+                        <input type="text" name="username" class="form-control form-control-lg shadow-sm"
+                            placeholder="e.g. alex.smith" required>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold" for="deptPassword">Password</label>
+                        <input type="password" name="password" id="deptPassword"
+                            class="form-control form-control-lg shadow-sm" placeholder="••••••••" required>
+
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="showDeptPw"
+                                onclick="togglePassword('deptPassword')">
+                            <label class="form-check-label" for="showDeptPw">Show Password</label>
+                        </div>
+                    </div>
+
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-success btn-lg px-4 shadow-sm mt-2">
+                            <i class="fas fa-user-plus me-2"></i> Register User
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 👥 Registered Department Users -->
+        <div class="card shadow-lg rounded-4 p-4 border-0">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-users-cog fa-lg text-dark me-2"></i>
+                <h4 class="mb-0">Registered Department Users</h4>
+            </div>
+
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th><i class="fas fa-user me-1"></i> Username</th>
+                        <th><i class="fas fa-layer-group me-1"></i> Department</th>
+                        <th class="text-end"><i class="fas fa-tools me-1"></i> Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in department_users %}
+                    <tr>
+                        <td class="fw-semibold">{{ user.username }}</td>
+                        <td class="text-capitalize">{{ user.department }}</td>
+                        <td class="text-end d-flex justify-content-end flex-wrap gap-2">
+                            <a href="/remove_department_user/{{ user.id }}"
+                                class="btn btn-outline-danger btn-sm shadow-sm">
+                                <i class="fas fa-trash-alt me-1"></i> Remove
+                            </a>
+                            <button type="button" class="btn btn-outline-warning btn-sm shadow-sm"
+                                data-bs-toggle="modal" data-bs-target="#resetPasswordModal" data-user-id="{{ user.id }}"
+                                data-username="{{ user.username }}">
+                                <i class="fas fa-key me-1"></i> Reset Password
+                            </button>
+
+                            {% if user.department == 'mot' %}
+                            <form method="POST" action="{{ url_for('reset_mot_logs', user_id=user.id) }}"
+                                onsubmit="return confirm('Clear last month\'s MOT logs for {{ user.username }}?')">
+                                <button class="btn btn-outline-secondary btn-sm shadow-sm">
+                                    <i class="fas fa-broom me-1"></i> Clear Logs
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-3">
+                            <i class="fas fa-info-circle me-2"></i> No department users registered yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- JavaScript to Show/Hide Reset Password Form -->
+    <script>
+        function showResetPasswordForm(userId) {
+            document.getElementById("reset_user_id").value = userId;
+            document.getElementById("resetPasswordForm").style.display = "block";
+        }
+
+        function hideResetPasswordForm() {
+            document.getElementById("resetPasswordForm").style.display = "none";
+        }
+    </script>
+
+    <!-- Hidden Manual Clock-Out Form -->
+    <div id="manualClockOutForm" style="display: none;">
+        <h3>Manual Clock-Out</h3>
+        <form id="clockOutForm" method="POST" action="/manual_clock_out">
+            <input type="hidden" name="employee_id" id="employee_id">
+
+            <label for="clock_out_time">Enter Clock-Out Time:</label>
+            <input type="datetime-local" name="clock_out_time" id="clock_out_time" required>
+
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-check-circle"></i> Submit
+            </button>
+            <button type="button" onclick="hideClockOutForm()" class="btn btn-danger">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+        </form>
+    </div>
+
+    <!-- Hidden Manual Clock-In Form -->
+    <div id="manualClockInForm" style="display: none;">
+        <h3>Manual Clock-In</h3>
+        <form id="clockInForm" method="POST" action="/manual_clock_in">
+            <input type="hidden" name="employee_id" id="clock_in_employee_id">
+
+            <label for="clock_in_time">Enter Clock-In Time:</label>
+            <input type="datetime-local" name="clock_in_time" id="clock_in_time" required>
+
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-check-circle"></i> Submit
+            </button>
+            <button type="button" onclick="hideClockInForm()" class="btn btn-danger">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+        </form>
+    </div>
+
+    <!-- JavaScript to Show/Hide Form -->
+    <script>
+        function showClockOutForm(employeeId) {
+            // Hide any open forms first
+            hideClockOutForm();
+
+            // Set Employee ID in the form
+            document.getElementById("employee_id").value = employeeId;
+
+            // Show the form right below the selected employee row
+            let row = document.querySelector(`[data-employee-id='${employeeId}']`);
+            let formContainer = document.getElementById("manualClockOutForm");
+
+            row.after(formContainer);
+            formContainer.style.display = "block";
+        }
+
+        function hideClockOutForm() {
+            document.getElementById("manualClockOutForm").style.display = "none";
+        }
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const toggleButtons = document.querySelectorAll('.toggle-log-btn');
+
+            toggleButtons.forEach(button => {
+                const targetId = button.getAttribute('data-bs-target');
+                const collapseEl = document.querySelector(targetId);
+
+                // Bootstrap collapse instance
+                const collapseInstance = new bootstrap.Collapse(collapseEl, { toggle: false });
+
+                collapseEl.addEventListener('show.bs.collapse', () => {
+                    button.innerHTML = `<i class="fas fa-eye-slash me-1"></i> Hide Logs`;
+                });
+
+                collapseEl.addEventListener('hide.bs.collapse', () => {
+                    button.innerHTML = `<i class="fas fa-clock me-1"></i> Show Logs`;
+                });
+            });
+        });
+    </script>
+
+    <script>
+        function togglePassword(fieldId) {
+            const input = document.getElementById(fieldId);
+            if (input) {
+                input.type = input.type === "password" ? "text" : "password";
+            }
+        }
+    </script>
+
+    <script>
+        function showClockInForm(employeeId) {
+            hideClockInForm();  // close any open forms
+            document.getElementById("clock_in_employee_id").value = employeeId;
+
+            let row = document.querySelector(`[data-employee-id='${employeeId}']`);
+            let formContainer = document.getElementById("manualClockInForm");
+
+            row.after(formContainer);
+            formContainer.style.display = "block";
+        }
+
+        function hideClockInForm() {
+            document.getElementById("manualClockInForm").style.display = "none";
+        }
+    </script>
+
+    <!-- 🔐 Password Reset Modal -->
+    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="POST" action="{{ url_for('reset_department_user_password') }}" class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="resetPasswordModalLabel">Reset Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="user_id" id="modalUserId">
+                    <p><strong>Username:</strong> <span id="modalUsername"></span></p>
+                    <div class="mb-3">
+                        <label for="modalNewPassword" class="form-label">New Password</label>
+                        <div class="input-group">
+                            <input type="password" name="new_password" id="modalNewPassword" class="form-control"
+                                required>
+                            <button class="btn btn-outline-secondary" type="button"
+                                onclick="togglePassword('modalNewPassword')">
+                                👁
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm Reset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const resetModal = document.getElementById('resetPasswordModal');
+        if (resetModal) {
+            resetModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const userId = button.getAttribute('data-user-id');
+                const username = button.getAttribute('data-username');
+
+                document.getElementById('modalUserId').value = userId;
+                document.getElementById('modalUsername').innerText = username;
+            });
+        }
+    </script>
+    <!-- 🔔 Confirm Action Modal -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-warning">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="confirmDeleteModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Confirm Action
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body fw-semibold" id="confirmDeleteModalMessage">
+                    Are you sure you want to proceed?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+                    <a id="confirmDeleteModalYes" href="#" class="btn btn-danger">Yes, proceed</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const confirmModal = document.getElementById('confirmDeleteModal');
+        confirmModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const message = button.getAttribute('data-message');
+            const action = button.getAttribute('data-action');
+
+            document.getElementById('confirmDeleteModalMessage').textContent = message;
+            document.getElementById('confirmDeleteModalYes').setAttribute('href', action);
+        });
+    </script>
+
+</div>
+{% endblock %}
