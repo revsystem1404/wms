@@ -32,28 +32,33 @@ def allowed_file(filename):
 
 # Employee model
 class Employee(db.Model):
+    __tablename__ = 'employee'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    monthly_overtime = db.Column(db.Integer, default=0)  # Ensure this line is in the model
+    monthly_overtime = db.Column(db.Integer, default=0)
     hourly_rate = db.Column(db.Float, default=15.00)
 
 class DepartmentUser(db.Model):
+    __tablename__ = 'department_user'
     id = db.Column(db.Integer, primary_key=True)
-    department = db.Column(db.String(50), nullable=False)  # Like 'MOT', 'Prep'
+    department = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
 
 class TimeTrackerUser(db.Model):
+    __tablename__ = 'time_tracker_user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)  # Store hashed passwords
+    password = db.Column(db.String(100), nullable=False)
 
 class VehicleKeyUser(db.Model):
+    __tablename__ = 'vehicle_key_user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)  # Store hashed passwords
+    password = db.Column(db.String(100), nullable=False)
 
 class MOTLog(db.Model):
+    __tablename__ = 'mot_log'
     id = db.Column(db.Integer, primary_key=True)
     vehicle_reg = db.Column(db.String(20), nullable=False)
     task = db.Column(db.String(100), nullable=False)
@@ -61,20 +66,21 @@ class MOTLog(db.Model):
     start_time = db.Column(db.DateTime, nullable=True)
     end_time = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(20), default='in_progress')  # NEW
-    submitted_at = db.Column(db.DateTime, default=datetime.now)  # NEW
+    status = db.Column(db.String(20), default='in_progress')
+    submitted_at = db.Column(db.DateTime, default=datetime.now)
 
 class AssignedTask(db.Model):
+    __tablename__ = 'assigned_task'
     id = db.Column(db.Integer, primary_key=True)
     department = db.Column(db.String(50), nullable=False)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
     image_filename = db.Column(db.String(255), nullable=True)
-    assigned_to = db.Column(db.String(50), nullable=True)  # Technician username
-    status = db.Column(db.String(20), default='pending')   # pending, in_progress, completed
-    start_time = db.Column(db.DateTime, nullable=True)     # To store when the task starts
-    complete_time = db.Column(db.DateTime, nullable=True)  # To store when the task is completed
+    assigned_to = db.Column(db.String(50), nullable=True)
+    status = db.Column(db.String(20), default='pending')
+    start_time = db.Column(db.DateTime, nullable=True)
+    complete_time = db.Column(db.DateTime, nullable=True)
     vehicle_reg = db.Column(db.String(20), nullable=True)
     
     # New fields for delivery/collection
@@ -84,6 +90,7 @@ class AssignedTask(db.Model):
     contact_notes = db.Column(db.Text, nullable=True)
 
 class AssignedTaskImage(db.Model):
+    __tablename__ = 'assigned_task_image'
     id = db.Column(db.Integer, primary_key=True)
     task_id = db.Column(db.Integer, db.ForeignKey('assigned_task.id'), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
@@ -91,6 +98,7 @@ class AssignedTaskImage(db.Model):
     task = db.relationship('AssignedTask', backref=db.backref('images', lazy=True))
 
 class WorkSession(db.Model):
+    __tablename__ = 'work_session'
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     clock_in = db.Column(db.DateTime, nullable=False, default=datetime.now)
@@ -111,10 +119,11 @@ class WorkSession(db.Model):
         return 0
     
 class VehicleKey(db.Model):
+    __tablename__ = 'vehicle_key'
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     key_checkout_time = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    key_number = db.Column(db.String(5), nullable=False)  # Stores the last 5 digits of the key
+    key_number = db.Column(db.String(5), nullable=False)
     key_return_time = db.Column(db.DateTime, nullable=True)
 
     employee = db.relationship('Employee', backref=db.backref('vehicle_keys', lazy=True))
