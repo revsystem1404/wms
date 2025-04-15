@@ -11,4 +11,4 @@ pip install -r requirements.txt
 mkdir -p static/uploads
 
 # Run database migrations safely
-python -c "from app import app, db; with app.app_context(): db.create_all()"
+python init_db.py
