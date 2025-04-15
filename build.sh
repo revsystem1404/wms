@@ -10,5 +10,5 @@ pip install -r requirements.txt
 # Create the static/uploads directory if it doesn't exist
 mkdir -p static/uploads
 
-# Run database migrations
-python -c "from app import app, db; app.app_context().push(); db.create_all()"
+# Run database migrations safely
+python -c "from app import app, db; with app.app_context(): db.create_all()"

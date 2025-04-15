@@ -1582,5 +1582,7 @@ def download_mot_logs():
     filename = f"MOT_{technician_name}_{current_month}_{current_year}.pdf"
     return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
 
-app = Flask(__name__)
-app.config.from_object(Config)
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run()
