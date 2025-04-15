@@ -43,19 +43,19 @@ class DepartmentUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     department = db.Column(db.String(50), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
+    password = db.Column(db.String(255), nullable=False)  # Increased from 200 to 255
 
 class TimeTrackerUser(db.Model):
     __tablename__ = 'time_tracker_user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(255), nullable=False)  # Increased from 100 to 255
 
 class VehicleKeyUser(db.Model):
     __tablename__ = 'vehicle_key_user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(255), nullable=False)  # Increased from 100 to 255
 
 class MOTLog(db.Model):
     __tablename__ = 'mot_log'
