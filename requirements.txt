@@ -4,7 +4,7 @@ Flask-Migrate==4.0.5
 Werkzeug==2.3.7
 SQLAlchemy==2.0.23
 fpdf==1.7.2
-pandas==2.1.0
+pandas==1.5.3
 APScheduler==3.10.4
 gunicorn==21.2.0
 psycopg2-binary==2.9.9
@@ -12,3 +12,4 @@ openpyxl==3.1.2
 Pillow==10.0.0
 python-dotenv==1.0.0
 reportlab==4.0.7
+numpy==1.24.4
