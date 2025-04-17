@@ -266,18 +266,24 @@ def worklog_mot():
         extract('year', MOTLog.start_time) == now.year
     ).order_by(MOTLog.start_time.desc()).all()
 
+    # Convert MOT logs to local time
+    for log in logs:
+        if log.start_time:
+            log.start_time = log.start_time.replace(tzinfo=pytz.utc).astimezone(london)
+        if log.end_time:
+            log.end_time = log.end_time.replace(tzinfo=pytz.utc).astimezone(london)
+
     # Logs still in progress
     in_progress_logs = [log for log in logs if log.status == 'in_progress']
 
-    # ✅ Logs submitted today
+    # Logs submitted today
     today = now.date()
     log_count = sum(
         1 for log in logs
-        if log.status == 'completed' and log.end_time and
-        log.end_time.astimezone(london).date() == today
+        if log.status == 'completed' and log.end_time and log.end_time.date() == today
     )
 
-    # ✅ Logs completed this month
+    # Logs completed this month
     log_count_this_month = MOTLog.query.filter(
         MOTLog.technician == technician_name,
         MOTLog.status == 'completed',
@@ -285,11 +291,11 @@ def worklog_mot():
         extract('year', MOTLog.end_time) == now.year
     ).count()
 
-    # ✅ Daily summary
+    # Daily summary
     daily_summary_raw = defaultdict(int)
     for log in logs:
         if log.status == 'completed' and log.end_time:
-            log_date = log.end_time.astimezone(london).date()
+            log_date = log.end_time.date()
             daily_summary_raw[log_date] += 1
 
     daily_summary = {
@@ -297,16 +303,23 @@ def worklog_mot():
         for date in sorted(daily_summary_raw)
     }
 
-    # ✅ Assigned tasks for MOT
+    # Assigned tasks
     assigned_tasks = AssignedTask.query.filter_by(department='mot').order_by(AssignedTask.created_at.desc()).all()
 
-    # ✅ Completed tasks
+    # Convert assigned task timestamps to local time
+    for task in assigned_tasks:
+        if task.created_at:
+            task.created_at = task.created_at.replace(tzinfo=pytz.utc).astimezone(london)
+        if task.start_time:
+            task.start_time = task.start_time.replace(tzinfo=pytz.utc).astimezone(london)
+        if task.complete_time:
+            task.complete_time = task.complete_time.replace(tzinfo=pytz.utc).astimezone(london)
+
     completed_tasks = [
         task for task in assigned_tasks
         if task.status == 'completed' and task.assigned_to == technician_name
     ]
 
-    # ✅ Tasks completed this month
     completed_task_count = AssignedTask.query.filter(
         AssignedTask.department == 'mot',
         AssignedTask.assigned_to == technician_name,
@@ -315,7 +328,6 @@ def worklog_mot():
         extract('year', AssignedTask.complete_time) == now.year
     ).count()
 
-    # ✅ Tasks assigned today
     assigned_today_count = AssignedTask.query.filter(
         AssignedTask.department == 'mot',
         AssignedTask.assigned_to == technician_name,
@@ -365,7 +377,6 @@ def edit_employee(id):
 def accept_mot_task(task_id):
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     if 'department_logged_in' not in session or session.get('department_name') != 'mot':
         flash("Unauthorized action", "danger")
@@ -383,9 +394,9 @@ def accept_mot_task(task_id):
 
     task.assigned_to = technician_name
     task.status = 'in_progress'
-    
-    # ⏰ Set start time in local timezone
-    task.start_time = datetime.now(pytz.utc).astimezone(london)
+
+    # ✅ Save as UTC (recommended for DB)
+    task.start_time = datetime.now(pytz.utc)
 
     db.session.commit()
 
@@ -396,7 +407,6 @@ def accept_mot_task(task_id):
 def complete_mot_task(task_id):
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     if 'department_logged_in' not in session or session.get('department_name') != 'mot':
         flash("Unauthorized action", "danger")
@@ -412,12 +422,12 @@ def complete_mot_task(task_id):
         flash("You are not assigned to this task.", "danger")
         return redirect(url_for('worklog_mot'))
 
-    # ⏰ Use localized complete time
-    complete_time = datetime.now(pytz.utc).astimezone(london)
+    # ✅ Use UTC for storing timestamps
+    complete_time = datetime.now(pytz.utc)
     task.status = 'completed'
     task.complete_time = complete_time
 
-    # ✅ Create MOT log with localized times
+    # ✅ Log in UTC (convert when displaying)
     mot_log = MOTLog(
         vehicle_reg=task.vehicle_reg or "-",
         task=task.title,
@@ -568,7 +578,6 @@ def department_logout():
 def mot_start_work():
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     if 'department_logged_in' not in session or session.get('department_name') != 'mot':
         flash("Unauthorized access", "danger")
@@ -581,11 +590,12 @@ def mot_start_work():
     vehicle_reg = request.form['vehicle_reg']
     task = request.form['task']
 
+    # ✅ Store timestamp in UTC (convert on display only)
     new_log = MOTLog(
         vehicle_reg=vehicle_reg,
         task=task,
         technician=technician_name,
-        start_time=datetime.now(pytz.utc).astimezone(london),
+        start_time=datetime.now(pytz.utc),
         status='in_progress'
     )
     db.session.add(new_log)
@@ -598,7 +608,6 @@ def mot_start_work():
 def mot_complete_work():
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     if 'department_logged_in' not in session or session.get('department_name') != 'mot':
         flash("Unauthorized access", "danger")
@@ -615,7 +624,8 @@ def mot_complete_work():
     ).order_by(MOTLog.start_time.desc()).first()
 
     if latest_log:
-        latest_log.end_time = datetime.now(pytz.utc).astimezone(london)
+        # ✅ Store in UTC
+        latest_log.end_time = datetime.now(pytz.utc)
         latest_log.status = 'completed'
         latest_log.notes = request.form.get('notes') or ""
         db.session.commit()
@@ -629,7 +639,6 @@ def mot_complete_work():
 def mot_complete_specific_log(log_id):
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     if 'department_logged_in' not in session or session.get('department_name') != 'mot':
         flash("Unauthorized access", "danger")
@@ -646,7 +655,8 @@ def mot_complete_specific_log(log_id):
         flash("Invalid or unauthorized log entry.", "danger")
         return redirect(url_for('worklog_mot'))
 
-    log.end_time = datetime.now(pytz.utc).astimezone(london)
+    # ✅ Store in UTC
+    log.end_time = datetime.now(pytz.utc)
     log.status = 'completed'
     log.notes = request.form.get('notes') or log.notes
     db.session.commit()
@@ -658,7 +668,6 @@ def mot_complete_specific_log(log_id):
 def assign_work():
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     if 'admin_logged_in' not in session:
         flash("Admin login required", "danger")
@@ -682,12 +691,8 @@ def assign_work():
         description = request.form.get('description')
         assigned_to = request.form.get('assigned_to') or None
 
-        # Get delivery/collection fields if applicable
-        contact_name = None
-        contact_number = None
-        contact_address = None
-        contact_notes = None
-        vehicle_reg = None
+        # Delivery/Collection fields
+        contact_name = contact_number = contact_address = contact_notes = vehicle_reg = None
 
         if title in ["Delivery", "Collection"]:
             contact_name = request.form.get('contact_name')
@@ -717,9 +722,7 @@ def assign_work():
                 )
             title = custom_title.strip()
 
-        # 🌍 Timezone-aware timestamp
-        created_at = datetime.now(pytz.utc).astimezone(london)
-
+        # ✅ Let default in model (UTC) handle created_at, or set explicitly in UTC
         task = AssignedTask(
             department=department,
             title=title,
@@ -730,8 +733,9 @@ def assign_work():
             contact_address=contact_address,
             contact_notes=contact_notes,
             vehicle_reg=vehicle_reg,
-            created_at=created_at  # 👈 explicitly set
+            created_at=datetime.now(pytz.utc)  # ✅ UTC
         )
+
         db.session.add(task)
         db.session.flush()
 
@@ -755,15 +759,35 @@ def assign_work():
 
 @app.route('/manage_assigned_tasks')
 def manage_assigned_tasks():
+    from datetime import datetime
+    import pytz
+
     if 'admin_logged_in' not in session:
         flash("Admin login required", "danger")
         return redirect(url_for('login'))
 
-    tasks = AssignedTask.query.filter(AssignedTask.status != 'completed').order_by(AssignedTask.created_at.desc()).all()
+    london = pytz.timezone('Europe/London')
+
+    tasks = AssignedTask.query.filter(
+        AssignedTask.status != 'completed'
+    ).order_by(AssignedTask.created_at.desc()).all()
+
+    # 🔁 Convert task timestamps to local time
+    for task in tasks:
+        if task.created_at:
+            task.created_at = task.created_at.replace(tzinfo=pytz.utc).astimezone(london)
+        if task.start_time:
+            task.start_time = task.start_time.replace(tzinfo=pytz.utc).astimezone(london)
+        if task.complete_time:
+            task.complete_time = task.complete_time.replace(tzinfo=pytz.utc).astimezone(london)
+
     return render_template('manage_assigned_tasks.html', tasks=tasks)
 
 @app.route('/edit_assigned_task/<int:task_id>', methods=['GET', 'POST'])
 def edit_assigned_task(task_id):
+    from datetime import datetime
+    import pytz
+
     if 'admin_logged_in' not in session:
         flash("Admin access required.", "danger")
         return redirect(url_for('login'))
@@ -777,15 +801,14 @@ def edit_assigned_task(task_id):
         task.title = request.form.get('title')
         task.description = request.form.get('description')
         task.assigned_to = request.form.get('assigned_to') or None
-        
-        # Handle delivery/collection fields
+
+        # Delivery/collection fields
         if task.title in ["Delivery", "Collection"]:
             task.contact_name = request.form.get('contact_name')
             task.contact_number = request.form.get('contact_number')
             task.contact_address = request.form.get('contact_address')
             task.contact_notes = request.form.get('contact_notes')
         else:
-            # Clear these fields if not delivery/collection
             task.contact_name = None
             task.contact_number = None
             task.contact_address = None
@@ -794,6 +817,15 @@ def edit_assigned_task(task_id):
         db.session.commit()
         flash("Task updated successfully.", "success")
         return redirect(url_for('manage_assigned_tasks'))
+
+    # 🌍 Convert to London time for display
+    london = pytz.timezone('Europe/London')
+    if task.created_at:
+        task.created_at = task.created_at.replace(tzinfo=pytz.utc).astimezone(london)
+    if task.start_time:
+        task.start_time = task.start_time.replace(tzinfo=pytz.utc).astimezone(london)
+    if task.complete_time:
+        task.complete_time = task.complete_time.replace(tzinfo=pytz.utc).astimezone(london)
 
     return render_template(
         'edit_assigned_task.html',
@@ -853,11 +885,11 @@ def view_completed_tasks_by_department():
         query = query.filter_by(assigned_to=technician)
     completed_tasks = query.order_by(AssignedTask.created_at.desc()).all()
 
-    # 🌍 Convert created_at and complete_time to local timezone
+    # 🌍 Convert AssignedTask timestamps
     for task in completed_tasks:
-        if task.created_at:
+        if task.created_at and task.created_at.tzinfo is None:
             task.created_at = task.created_at.replace(tzinfo=pytz.utc).astimezone(london)
-        if task.complete_time:
+        if task.complete_time and task.complete_time.tzinfo is None:
             task.complete_time = task.complete_time.replace(tzinfo=pytz.utc).astimezone(london)
 
     manual_logs = []
@@ -867,11 +899,11 @@ def view_completed_tasks_by_department():
             manual_query = manual_query.filter_by(technician=technician)
         manual_logs = manual_query.order_by(MOTLog.start_time.desc()).all()
 
-        # 🌍 Convert MOT log times to local timezone
+        # 🌍 Convert MOTLog timestamps
         for log in manual_logs:
-            if log.start_time:
+            if log.start_time and log.start_time.tzinfo is None:
                 log.start_time = log.start_time.replace(tzinfo=pytz.utc).astimezone(london)
-            if log.end_time:
+            if log.end_time and log.end_time.tzinfo is None:
                 log.end_time = log.end_time.replace(tzinfo=pytz.utc).astimezone(london)
 
     return render_template(
@@ -949,9 +981,8 @@ def reset_department_user_password():
 
 @app.route('/reset_mot_logs/<int:user_id>', methods=['POST'])
 def reset_mot_logs(user_id):
-    from datetime import datetime
+    from datetime import datetime, timedelta
     import pytz
-    london = pytz.timezone('Europe/London')
 
     if 'admin_logged_in' not in session:
         flash("Admin access required.", "danger")
@@ -962,21 +993,23 @@ def reset_mot_logs(user_id):
         flash("User not found or not in MOT department.", "danger")
         return redirect(url_for('admin_dashboard'))
 
-    now = datetime.now(pytz.utc).astimezone(london)
+    # 🌍 Get start and end of previous month in London time
+    london = pytz.timezone('Europe/London')
+    now_local = datetime.now(pytz.utc).astimezone(london)
 
-    # Calculate last month in local time
-    if now.month == 1:
-        last_month = 12
-        year = now.year - 1
-    else:
-        last_month = now.month - 1
-        year = now.year
+    first_day_this_month = london.localize(datetime(now_local.year, now_local.month, 1))
+    last_month_end_local = first_day_this_month - timedelta(seconds=1)
+    first_day_last_month_local = london.localize(datetime(last_month_end_local.year, last_month_end_local.month, 1))
 
-    # Delete only that user's logs from last month
+    # Convert boundaries to UTC for database filtering
+    start_utc = first_day_last_month_local.astimezone(pytz.utc)
+    end_utc = first_day_this_month.astimezone(pytz.utc)
+
+    # 🧹 Delete logs in UTC range
     logs_to_delete = MOTLog.query.filter(
         MOTLog.technician == user.username,
-        extract('month', MOTLog.start_time) == last_month,
-        extract('year', MOTLog.start_time) == year
+        MOTLog.start_time >= start_utc,
+        MOTLog.start_time < end_utc
     ).all()
 
     for log in logs_to_delete:
@@ -1060,17 +1093,17 @@ def employee_time_tracker():
         flash("You must be logged in to access this page.", "danger")
         return redirect(url_for('time_tracker_login'))
 
-    employees = Employee.query.all()
-
     import pytz
     london = pytz.timezone('Europe/London')
 
+    employees = Employee.query.all()
+
     for emp in employees:
         for s in emp.sessions:
-            # Convert UTC timestamps to local timezone
-            if s.clock_in:
+            # 🛡️ Avoid double tz wrapping
+            if s.clock_in and s.clock_in.tzinfo is None:
                 s.clock_in = s.clock_in.replace(tzinfo=pytz.utc).astimezone(london)
-            if s.clock_out:
+            if s.clock_out and s.clock_out.tzinfo is None:
                 s.clock_out = s.clock_out.replace(tzinfo=pytz.utc).astimezone(london)
 
         total_minutes = sum(session.total_hours() for session in emp.sessions)
@@ -1085,23 +1118,26 @@ def employee_time_tracker():
 def clock_in(id):
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     employee = Employee.query.get(id)
     if employee:
-        now_local = datetime.now(pytz.utc).astimezone(london)
+        now_utc = datetime.now(pytz.utc)  # ✅ Store in UTC
+        london = pytz.timezone('Europe/London')
 
         new_session = WorkSession(
             employee_id=employee.id,
-            clock_in=now_local
+            clock_in=now_utc
         )
         db.session.add(new_session)
         db.session.commit()
 
+        # 🕒 Convert to London time for display
+        clock_in_local = now_utc.astimezone(london)
+
         return {
             'success': True,
             'action': 'clock_in',
-            'clock_in': new_session.clock_in.strftime('%A, %d-%m-%Y %H:%M:%S'),
+            'clock_in': clock_in_local.strftime('%A, %d-%m-%Y %H:%M:%S'),
             'clock_out': None,
             'total_hours': "0:00"
         }
@@ -1112,25 +1148,29 @@ def clock_in(id):
 def clock_out(id):
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     employee = Employee.query.get(id)
     if employee:
         session = WorkSession.query.filter_by(employee_id=employee.id, clock_out=None).first()
         if session:
-            now_local = datetime.now(pytz.utc).astimezone(london)
-            session.clock_out = now_local
+            now_utc = datetime.now(pytz.utc)  # ✅ Store in UTC
+            session.clock_out = now_utc
             db.session.commit()
 
             total_minutes = sum(s.total_hours() for s in employee.sessions)
             total_hours = total_minutes // 60
             total_remaining = total_minutes % 60
 
+            # 🕒 Convert to London time for display
+            london = pytz.timezone('Europe/London')
+            clock_in_local = session.clock_in.replace(tzinfo=pytz.utc).astimezone(london)
+            clock_out_local = now_utc.astimezone(london)
+
             return {
                 'success': True,
                 'action': 'clock_out',
-                'clock_in': session.clock_in.strftime('%A, %d-%m-%Y %H:%M:%S'),
-                'clock_out': session.clock_out.strftime('%A, %d-%m-%Y %H:%M:%S'),
+                'clock_in': clock_in_local.strftime('%A, %d-%m-%Y %H:%M:%S'),
+                'clock_out': clock_out_local.strftime('%A, %d-%m-%Y %H:%M:%S'),
                 'total_hours': f"{total_hours}:{total_remaining:02d}"
             }
     return {'success': False}, 400
@@ -1147,13 +1187,14 @@ def manual_clock_in():
     if employee_id and clock_in_time:
         employee = Employee.query.get(employee_id)
         if employee:
-            # ⏰ Parse and localize the input datetime
+            # ⏰ Parse local input and convert to UTC
             naive_time = datetime.strptime(clock_in_time, '%Y-%m-%dT%H:%M')
-            localized_time = london.localize(naive_time)
+            london_time = london.localize(naive_time)
+            utc_time = london_time.astimezone(pytz.utc)
 
             new_session = WorkSession(
                 employee_id=employee.id,
-                clock_in=localized_time
+                clock_in=utc_time  # ✅ Store in UTC
             )
             db.session.add(new_session)
             db.session.commit()
@@ -1174,17 +1215,17 @@ def manual_clock_out():
         employee = Employee.query.get(employee_id)
 
         if employee:
-            # Find the most recent open session
             session = WorkSession.query.filter_by(
                 employee_id=employee.id, clock_out=None
             ).order_by(WorkSession.clock_in.desc()).first()
 
             if session:
-                # ⏰ Parse and localize the manual clock-out time
+                # ⏰ Parse local input and convert to UTC
                 naive_time = datetime.strptime(clock_out_time, '%Y-%m-%dT%H:%M')
-                localized_time = london.localize(naive_time)
+                london_time = london.localize(naive_time)
+                utc_time = london_time.astimezone(pytz.utc)
 
-                session.clock_out = localized_time
+                session.clock_out = utc_time  # ✅ Store in UTC
                 db.session.commit()
                 flash(f"Clock-out time manually set for {employee.name}", "success")
 
@@ -1206,14 +1247,16 @@ def update_session(session_id):
         clock_in_str = request.form.get('clock_in')
         clock_out_str = request.form.get('clock_out')
 
-        # ⏰ Localize both datetime inputs to Europe/London
+        # ⏰ Convert both to UTC before storing
         if clock_in_str:
             naive_in = datetime.strptime(clock_in_str, '%Y-%m-%dT%H:%M')
-            session_record.clock_in = london.localize(naive_in)
+            local_in = london.localize(naive_in)
+            session_record.clock_in = local_in.astimezone(pytz.utc)
 
         if clock_out_str:
             naive_out = datetime.strptime(clock_out_str, '%Y-%m-%dT%H:%M')
-            session_record.clock_out = london.localize(naive_out)
+            local_out = london.localize(naive_out)
+            session_record.clock_out = local_out.astimezone(pytz.utc)
         else:
             session_record.clock_out = None
 
@@ -1229,11 +1272,10 @@ def update_session(session_id):
 def return_vehicle_key(id):
     from datetime import datetime
     import pytz
-    london = pytz.timezone('Europe/London')
 
     vehicle_key = VehicleKey.query.get(id)
     if vehicle_key:
-        vehicle_key.key_return_time = datetime.now(pytz.utc).astimezone(london)
+        vehicle_key.key_return_time = datetime.now(pytz.utc)  # ✅ Store in UTC
         db.session.commit()
 
     return redirect(url_for('vehicle_key_monitor'))
@@ -1389,6 +1431,7 @@ def delete_employee_logs(employee_id):
 @app.route('/download_employee_pdf/<int:employee_id>')
 def download_employee_pdf(employee_id):
     import pytz
+    from datetime import datetime
     london = pytz.timezone('Europe/London')
 
     employee = Employee.query.get(employee_id)
@@ -1402,12 +1445,10 @@ def download_employee_pdf(employee_id):
     total_remaining_minutes = total_minutes % 60
     total_worked_hours = f"{total_hours}:{total_remaining_minutes:02d}"
 
-    # Pay calculations
     hourly_rate = employee.hourly_rate
     total_pay = round((total_minutes / 60) * hourly_rate, 2)
     overtime_pay = round(employee.monthly_overtime * hourly_rate, 2)
 
-    # Create PDF
     pdf = FPDF()
     pdf.add_page()
 
@@ -1432,13 +1473,19 @@ def download_employee_pdf(employee_id):
     pdf.cell(40, 10, txt="Wage for Day", border=1, align='C')
     pdf.ln()
 
-    # Work Sessions
     pdf.set_font('Arial', '', 10)
     if employee.sessions:
         for session in employee.sessions:
-            clock_in = session.clock_in.replace(tzinfo=pytz.utc).astimezone(london)
+            clock_in = session.clock_in
+            if clock_in and clock_in.tzinfo is None:
+                clock_in = clock_in.replace(tzinfo=pytz.utc)
+            clock_in = clock_in.astimezone(london)
+
             if session.clock_out:
-                clock_out = session.clock_out.replace(tzinfo=pytz.utc).astimezone(london)
+                clock_out = session.clock_out
+                if clock_out.tzinfo is None:
+                    clock_out = clock_out.replace(tzinfo=pytz.utc)
+                clock_out = clock_out.astimezone(london)
                 clock_out_str = clock_out.strftime('%A, %d/%m/%Y %H:%M:%S')
             else:
                 clock_out_str = "Still Working"
@@ -1471,12 +1518,20 @@ def export_vehicle_keys():
 
     vehicle_keys = VehicleKey.query.all()
 
-    # Convert Data to Pandas DataFrame
     data = []
     for vk in vehicle_keys:
-        checkout_local = vk.key_checkout_time.replace(tzinfo=pytz.utc).astimezone(london)
+        # 🕒 Convert checkout time safely
+        checkout = vk.key_checkout_time
+        if checkout and checkout.tzinfo is None:
+            checkout = checkout.replace(tzinfo=pytz.utc)
+        checkout_local = checkout.astimezone(london)
+
+        # 🕒 Convert return time safely
         if vk.key_return_time:
-            return_local = vk.key_return_time.replace(tzinfo=pytz.utc).astimezone(london)
+            return_time = vk.key_return_time
+            if return_time.tzinfo is None:
+                return_time = return_time.replace(tzinfo=pytz.utc)
+            return_local = return_time.astimezone(london)
             return_str = return_local.strftime("%Y-%m-%d %H:%M:%S")
         else:
             return_str = "Not Returned"
@@ -1500,18 +1555,17 @@ from datetime import datetime, timedelta
 
 def generate_employee_pdf(employee):
     """Generate PDF for each employee and save it"""
+    from datetime import datetime, timedelta
     import pytz
     london = pytz.timezone('Europe/London')
 
-    now = datetime.now()
-    first_day_of_this_month = datetime(now.year, now.month, 1)
-    first_day_of_last_month = datetime(
-        first_day_of_this_month.year,
-        first_day_of_this_month.month - 1 if first_day_of_this_month.month > 1 else 12,
-        1
-    )
+    now = datetime.now(pytz.utc)
+    first_day_of_this_month = datetime(now.year, now.month, 1, tzinfo=pytz.utc)
+
     if first_day_of_this_month.month == 1:
-        first_day_of_last_month = datetime(now.year - 1, 12, 1)
+        first_day_of_last_month = datetime(now.year - 1, 12, 1, tzinfo=pytz.utc)
+    else:
+        first_day_of_last_month = datetime(now.year, now.month - 1, 1, tzinfo=pytz.utc)
 
     # Get all work sessions for the previous month
     sessions = WorkSession.query.filter(
@@ -1520,39 +1574,32 @@ def generate_employee_pdf(employee):
         WorkSession.clock_out < first_day_of_this_month
     ).all()
 
-    # Calculate total worked hours in minutes
     total_minutes = sum(session.total_hours() for session in sessions)
     total_hours = total_minutes // 60
     total_remaining_minutes = total_minutes % 60
     total_worked_hours = f"{total_hours}:{total_remaining_minutes:02d}"
 
-    # Workdays and expected work hours
     workdays = sum(
         1 for i in range((first_day_of_this_month - first_day_of_last_month).days)
         if (first_day_of_last_month + timedelta(days=i)).weekday() < 6
     )
     expected_minutes = workdays * 8 * 60
 
-    # Overtime
     overtime_minutes = max(total_minutes - expected_minutes, 0)
     overtime_hours = overtime_minutes // 60
     overtime_remaining_minutes = overtime_minutes % 60
 
-    # Pay
     hourly_rate = employee.hourly_rate
     total_pay = round((total_minutes / 60) * hourly_rate, 2)
     overtime_pay = round((overtime_minutes / 60) * hourly_rate, 2)
 
-    # Create PDF
     pdf = FPDF()
     pdf.add_page()
 
-    # Header
     pdf.set_font('Arial', 'B', 16)
     pdf.cell(200, 10, txt=f"Employee Report: {employee.name} (£{hourly_rate:.2f}/hr)", ln=True, align='C')
     pdf.ln(10)
 
-    # Summary
     pdf.set_font('Arial', 'B', 12)
     pdf.cell(200, 10, txt=f"Total Hours Worked: {total_worked_hours}", ln=True, align='L')
     pdf.cell(200, 10, txt=f"Overtime: {overtime_hours} hrs {overtime_remaining_minutes} mins", ln=True, align='L')
@@ -1560,7 +1607,6 @@ def generate_employee_pdf(employee):
     pdf.cell(200, 10, txt=f"Overtime Pay: £{overtime_pay:.2f}", ln=True, align='L')
     pdf.ln(10)
 
-    # Table Header
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(55, 10, txt="Clock In Time", border=1, align='C')
     pdf.cell(55, 10, txt="Clock Out Time", border=1, align='C')
@@ -1568,13 +1614,20 @@ def generate_employee_pdf(employee):
     pdf.cell(40, 10, txt="Wage for Day", border=1, align='C')
     pdf.ln()
 
-    # Work Sessions
     pdf.set_font('Arial', '', 10)
     if sessions:
         for session in sessions:
-            clock_in = session.clock_in.replace(tzinfo=pytz.utc).astimezone(london)
+            # ⏰ Safe timezone conversion
+            clock_in = session.clock_in
+            if clock_in.tzinfo is None:
+                clock_in = clock_in.replace(tzinfo=pytz.utc)
+            clock_in = clock_in.astimezone(london)
+
             if session.clock_out:
-                clock_out = session.clock_out.replace(tzinfo=pytz.utc).astimezone(london)
+                clock_out = session.clock_out
+                if clock_out.tzinfo is None:
+                    clock_out = clock_out.replace(tzinfo=pytz.utc)
+                clock_out = clock_out.astimezone(london)
                 clock_out_str = clock_out.strftime('%d/%m/%Y %H:%M:%S')
             else:
                 clock_out_str = "Still Working"
@@ -1593,49 +1646,56 @@ def generate_employee_pdf(employee):
         pdf.cell(190, 10, txt="No work sessions available", border=1, align='C')
         pdf.ln()
 
-    # Save the PDF
     pdf_output_path = f"employee_report_{employee.id}_month_{now.strftime('%Y_%m')}.pdf"
     pdf.output(pdf_output_path)
     print(f"Generated PDF for {employee.name}: {pdf_output_path}")
 
 def reset_employee_time_tracker():
-    with app.app_context():
-        # Get current and previous month
-        now = datetime.now()
-        first_day_of_this_month = datetime(now.year, now.month, 1)
-        first_day_of_last_month = first_day_of_this_month - timedelta(days=1)
-        first_day_of_last_month = datetime(first_day_of_last_month.year, first_day_of_last_month.month, 1)
+    from datetime import datetime, timedelta
+    import pytz
+    london = pytz.timezone('Europe/London')
 
-        # Generate PDF and calculate overtime for each employee
+    with app.app_context():
+        # Use timezone-aware UTC time and convert to London
+        now = datetime.now(pytz.utc).astimezone(london)
+
+        first_day_of_this_month = datetime(now.year, now.month, 1, tzinfo=london)
+        if now.month == 1:
+            first_day_of_last_month = datetime(now.year - 1, 12, 1, tzinfo=london)
+        else:
+            first_day_of_last_month = datetime(now.year, now.month - 1, 1, tzinfo=london)
+
         employees = Employee.query.all()
         for emp in employees:
-            # Generate and save the PDF for the employee
             generate_employee_pdf(emp)
 
-            # Calculate and save overtime for the employee
             total_minutes = sum(session.total_hours() for session in emp.sessions)
             total_hours_worked = total_minutes // 60
-            workdays = sum(1 for i in range((first_day_of_this_month - first_day_of_last_month).days)
-                           if (first_day_of_last_month + timedelta(days=i)).weekday() < 6)
+
+            # Calculate working weekdays (Mon–Sat)
+            workdays = sum(
+                1 for i in range((first_day_of_this_month - first_day_of_last_month).days)
+                if (first_day_of_last_month + timedelta(days=i)).weekday() < 6
+            )
             expected_hours = workdays * 8
-            overtime_hours = max(total_hours_worked - expected_hours, 0)  # Overtime can't be negative
+            overtime_hours = max(total_hours_worked - expected_hours, 0)
+
             emp.monthly_overtime = overtime_hours
 
-        # Commit the overtime changes
         db.session.commit()
 
-        # Delete all work session logs after saving overtime
+        # ⚠️ After saving, wipe work sessions
         db.session.query(WorkSession).delete()
         db.session.commit()
 
         print("✅ Employee Time Tracker reset at midnight with overtime saved and PDFs generated!")
 
-# Set up the scheduler to run at 00:00 on the 1st of each month
+# Schedule it to run monthly at 00:00 (UTC)
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=reset_employee_time_tracker, trigger=CronTrigger(day=1, hour=0, minute=0))  # Runs on the 1st of every month at midnight
+scheduler.add_job(func=reset_employee_time_tracker, trigger=CronTrigger(day=1, hour=0, minute=0))
 scheduler.start()
 
-# Ensure the scheduler shuts down when the app exits
+import atexit
 atexit.register(lambda: scheduler.shutdown())
 
 from sqlalchemy import extract
@@ -1648,7 +1708,13 @@ from datetime import datetime
 
 @app.route('/download_mot_logs')
 def download_mot_logs():
+    from datetime import datetime
+    from io import BytesIO
+    from collections import defaultdict
     import pytz
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
     london = pytz.timezone('Europe/London')
 
     if 'department_logged_in' not in session or session.get('department_name') != 'mot':
@@ -1669,15 +1735,18 @@ def download_mot_logs():
         extract('year', MOTLog.start_time) == now.year
     ).order_by(MOTLog.start_time.asc()).all()
 
+    def to_london(dt):
+        if dt and dt.tzinfo is None:
+            dt = dt.replace(tzinfo=pytz.utc)
+        return dt.astimezone(london) if dt else None
+
     # Group logs by day
     daily_logs = defaultdict(list)
     for log in logs:
-        log_date = log.start_time.replace(tzinfo=pytz.utc).astimezone(london)
-        log.start_time = log_date  # Convert start_time in place
-        if log.end_time:
-            log.end_time = log.end_time.replace(tzinfo=pytz.utc).astimezone(london)
-        day = log_date.strftime("%A %d %B %Y")
-        daily_logs[day].append(log)
+        log.start_time = to_london(log.start_time)
+        log.end_time = to_london(log.end_time)
+        log_date_str = log.start_time.strftime("%A %d %B %Y")
+        daily_logs[log_date_str].append(log)
 
     # PDF setup
     buffer = BytesIO()
@@ -1704,8 +1773,7 @@ def download_mot_logs():
 
     draw_header()
 
-    for day in sorted(daily_logs.keys()):
-        logs_for_day = daily_logs[day]
+    for day, logs_for_day in sorted(daily_logs.items()):
         completed_count = 0
 
         for log in logs_for_day:
@@ -1714,7 +1782,6 @@ def download_mot_logs():
                 y = height - 60
                 draw_header()
 
-            # Primary row
             p.drawString(left_margin, y, log.start_time.strftime("%d %b %Y"))
             p.drawString(left_margin + 70, y, log.vehicle_reg[:10])
             p.drawString(left_margin + 140, y, log.task[:20])
@@ -1749,7 +1816,6 @@ def download_mot_logs():
             if log.status == 'completed' and log.end_time:
                 completed_count += 1
 
-        # After daily section
         if y < 60:
             p.showPage()
             y = height - 60
