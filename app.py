@@ -1333,14 +1333,14 @@ def employee_table():
     employees = Employee.query.all()
 
     for emp in employees:
-        for session in emp.sessions:
+        for s in emp.sessions:  # ← changed from `session` to `s`
             # 🌍 Convert timestamps to local time
-            if session.clock_in:
-                session.clock_in = session.clock_in.replace(tzinfo=pytz.utc).astimezone(london)
-            if session.clock_out:
-                session.clock_out = session.clock_out.replace(tzinfo=pytz.utc).astimezone(london)
+            if s.clock_in:
+                s.clock_in = s.clock_in.replace(tzinfo=pytz.utc).astimezone(london)
+            if s.clock_out:
+                s.clock_out = s.clock_out.replace(tzinfo=pytz.utc).astimezone(london)
 
-        total_minutes = sum(session.total_hours() for session in emp.sessions)
+        total_minutes = sum(s.total_hours() for s in emp.sessions)
         hours = total_minutes // 60
         minutes = total_minutes % 60
         emp.total_worked_hours = f"{hours}:{minutes:02d}"
